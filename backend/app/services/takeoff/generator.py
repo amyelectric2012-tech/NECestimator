@@ -126,4 +126,55 @@ def generate_takeoff_from_calculation(
         is_auto_generated=True,
     ))
 
+    # ----- Conduit (service entrance + branch circuits) -----
+    if service_amps >= 200:
+        conduit_size = "2 in"
+    elif service_amps >= 100:
+        conduit_size = "1-1/4 in"
+    else:
+        conduit_size = "1 in"
+
+    items.append(TakeoffItemCreate(
+        description=f"{conduit_size} EMT Conduit - Service Entrance",
+        category="conduit",
+        quantity=40,
+        unit="ft",
+        unit_cost=Decimal("2.40"),
+        labor_hours=round(40 / 40.0, 2),
+        is_auto_generated=True,
+        notes="Service entrance conduit run",
+    ))
+
+    items.append(TakeoffItemCreate(
+        description="EMT Fittings & Straps (service)",
+        category="conduit",
+        quantity=1,
+        unit="lot",
+        unit_cost=Decimal("45.00"),
+        labor_hours=1.0,
+        is_auto_generated=True,
+    ))
+
+    branch_conduit_ft = round(floor_area_sqft / 2.0, 0)
+    items.append(TakeoffItemCreate(
+        description="1/2 in EMT Conduit - Branch Circuits",
+        category="conduit",
+        quantity=branch_conduit_ft,
+        unit="ft",
+        unit_cost=Decimal("0.95"),
+        labor_hours=round(branch_conduit_ft / 60.0, 2),
+        is_auto_generated=True,
+        notes="Branch circuit conduit (rough estimate)",
+    ))
+
+    items.append(TakeoffItemCreate(
+        description="Wire Pull / Pulling Lubricant",
+        category="wire",
+        quantity=1,
+        unit="lot",
+        unit_cost=Decimal("25.00"),
+        labor_hours=0.5,
+        is_auto_generated=True,
+    ))
+
     return items

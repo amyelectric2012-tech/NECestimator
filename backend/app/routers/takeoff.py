@@ -1,7 +1,7 @@
 from decimal import Decimal
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from sqlalchemy.orm import Session
 
 from app.auth.deps import get_current_user
@@ -17,6 +17,7 @@ from app.schemas.takeoff import (
 from app.services.load_calc.engine import LoadCalcEngine
 from app.services.load_calc.schemas import LoadCalcRequest
 from app.services.takeoff.generator import generate_takeoff_from_calculation
+from app.services.takeoff.plan_reader import validate_plan_upload
 
 router = APIRouter(prefix="/projects/{project_id}/takeoff-items", tags=["Takeoff"])
 
@@ -111,14 +112,16 @@ def generate_takeoff(project_id: UUID, floor_area_sqft: float = 1500.0,
 
 
 @router.get("/", response_model=TakeoffSummary)
-def get_takeoff(project_id: UUID, labor_rate: float = 85.0, contingency_percent: float = 5.0,
+def get_takeoff(project_id: UUID, labor_rate: float | None = None, contingency_percent: float | None = None,
                 tax_percent: float = 0.0, current_user: User = Depends(get_current_user),
                 db: Session = Depends(get_db)):
     project = db.query(Project).filter(Project.id == str(project_id), Project.owner_id == current_user.id).first()
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
+    lr = labor_rate if labor_rate is not None else float(project.labor_rate or 85.0)
+    cp = contingency_percent if contingency_percent is not None else float(project.contingency_percent or 5.0)
     items = db.query(TakeoffItem).filter(TakeoffItem.project_id == str(project_id)).all()
-    return _summary(items, Decimal(str(labor_rate)), contingency_percent, tax_percent)
+    return _summary(items, Decimal(str(lr)), cp, tax_percent)
 
 
 @router.post("/", response_model=TakeoffItemResponse)
@@ -161,6 +164,58 @@ def update_takeoff_item(project_id: UUID, item_id: UUID, payload: TakeoffItemUpd
     db.commit()
     db.refresh(row)
     return _to_response(row)
+
+
+@router.patch("/settings", response_model=dict)
+def update_takeoff_settings(project_id: UUID, labor_rate: float | None = None, contingency_percent: float | None = None,
+                           current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    project = db.query(Project).filter(Project.id == str(project_id), Project.owner_id == current_user.id).first()
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    if labor_rate is not None:
+        project.labor_rate = labor_rate
+    if contingency_percent is not None:
+        project.contingency_percent = contingency_percent
+    db.commit()
+    return {"labor_rate": float(project.labor_rate), "contingency_percent": float(project.contingency_percent)}
+
+
+@router.post("/from-plan", response_model=list[TakeoffItemResponse])
+async def takeoff_from_plan(project_id: UUID, floor_area_sqft: float = 1500.0, file: UploadFile = File(...),
+                           current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    project = db.query(Project).filter(Project.id == str(project_id), Project.owner_id == current_user.id).first()
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    await validate_plan_upload(file)
+
+    from app.services.load_calc.engine import LoadCalcEngine
+    from app.services.load_calc.schemas import LoadCalcRequest
+    req = LoadCalcRequest(
+        project_type=project.project_type if project.project_type in ("single_family", "multi_family", "adu", "duplex") else "single_family",
+        floor_area_sqft=project.floor_area_sqft or floor_area_sqft,
+    )
+    calc_results = LoadCalcEngine().calculate(req)
+    std = calc_results[0]
+    items = generate_takeoff_from_calculation(project.id, std, project.floor_area_sqft or floor_area_sqft)
+    created = []
+    for it in items:
+        row = TakeoffItem(
+            project_id=str(project.id),
+            description=it.description + " (from plan)",
+            category=it.category,
+            quantity=it.quantity,
+            unit=it.unit,
+            unit_cost=it.unit_cost,
+            labor_hours=it.labor_hours,
+            is_auto_generated=True,
+            notes=it.notes,
+        )
+        db.add(row)
+        created.append(row)
+    db.commit()
+    for r in created:
+        db.refresh(r)
+    return [_to_response(r) for r in created]
 
 
 @router.delete("/{item_id}")

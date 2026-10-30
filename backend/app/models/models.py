@@ -9,6 +9,7 @@ from sqlalchemy import (
     Float,
     ForeignKey,
     Integer,
+    Numeric,
     String,
     Text,
 )
@@ -54,6 +55,8 @@ class Project(Base):
     hvac = Column(JSON, default=dict)
     largest_motor_va = Column(Float, default=0.0)
     existing_service_amps = Column(Float, nullable=True)
+    labor_rate = Column(Numeric(10, 2), default=85.00)
+    contingency_percent = Column(Float, default=5.0)
     owner_id = Column(UUID(as_uuid=False), ForeignKey("users.id"), nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
