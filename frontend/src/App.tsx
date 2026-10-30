@@ -46,6 +46,8 @@ export default function App() {
   const [chatHistory, setChatHistory] = useState<{ role: string; text: string }[]>([]);
   const [clients, setClients] = useState<any[]>([]);
   const [newClient, setNewClient] = useState({ name: "", email: "", phone: "", address: "" });
+  const [workDesc, setWorkDesc] = useState("");
+  const [workDescResult, setWorkDescResult] = useState<any>(null);
   const [error, setError] = useState("");
   const [newProj, setNewProj] = useState({ name: "", type: "single_family", area: "1500" });
 
@@ -139,6 +141,16 @@ export default function App() {
     if (!selected) return;
     try { const d = await api(`/projects/${selected.id}/takeoff`, { method: "POST" }); setTakeoff(d); }
     catch (e: any) { setError(e.message); }
+  }
+  async function generateFromDescription() {
+    if (!selected || !workDesc.trim()) return;
+    try {
+      const d = await api(`/projects/${selected.id}/takeoff-items/from-description`, { method: "POST", body: JSON.stringify({ description: workDesc }) });
+      setWorkDescResult(d);
+      // refresh takeoff summary
+      const s = await api(`/projects/${selected.id}/takeoff-items/`);
+      if (takeoff) setTakeoff({ ...takeoff, line_items: s.items, total_materials: s.total_material_cost, total_labor_hours: s.total_labor_hours, total_cost: s.grand_total });
+    } catch (e: any) { setError(e.message); }
   }
   async function saveTakeoff() {
     if (!selected || !takeoff) return;
@@ -279,6 +291,25 @@ export default function App() {
                 </select>
                 {selected.client_id && <span className="badge">{clients.find(c => c.id === selected.client_id)?.name}</span>}
               </div>
+
+              <h4 style={{ marginTop: 12 }}>Estimate from Work Description</h4>
+              <textarea value={workDesc} onChange={e => setWorkDesc(e.target.value)} placeholder="Describe the work, e.g. 'Install 100A service, 20 duplex receptacles, 8 switches, GFCI in kitchen, smoke detectors' (reference NEC articles like 210.8)" style={{ width: "100%" }} rows={3} />
+              <div className="row" style={{ marginTop: 8 }}>
+                <button className="btn" onClick={generateFromDescription}>Generate Estimate</button>
+              </div>
+              {workDescResult && (
+                <div style={{ marginTop: 8, fontSize: 13 }}>
+                  <p>Created {workDescResult.count} takeoff items.</p>
+                  {workDescResult.nec_references?.length > 0 && (
+                    <>
+                      <p style={{ fontWeight: 600 }}>NEC references:</p>
+                      {workDescResult.nec_references.map((r: string, i: number) => (
+                        <div key={i} style={{ padding: 6, background: "#f4f4f4", marginBottom: 4, borderRadius: 4, fontSize: 12 }}>{r}</div>
+                      ))}
+                    </>
+                  )}
+                </div>
+              )}
 
               {std && (
                 <>

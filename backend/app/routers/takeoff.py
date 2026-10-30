@@ -1,7 +1,7 @@
 from decimal import Decimal
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, Body, Depends, File, HTTPException, UploadFile
 from sqlalchemy.orm import Session
 
 from app.auth.deps import get_current_user
@@ -16,6 +16,7 @@ from app.schemas.takeoff import (
 )
 from app.services.load_calc.engine import LoadCalcEngine
 from app.services.load_calc.schemas import LoadCalcRequest
+from app.services.takeoff.from_description import generate_from_description
 from app.services.takeoff.generator import generate_takeoff_from_calculation
 from app.services.takeoff.plan_reader import validate_plan_upload
 
@@ -216,6 +217,38 @@ async def takeoff_from_plan(project_id: UUID, floor_area_sqft: float = 1500.0, f
     for r in created:
         db.refresh(r)
     return [_to_response(r) for r in created]
+
+
+@router.post("/from-description", response_model=dict)
+def takeoff_from_description(project_id: UUID, description: str = Body(..., embed=True),
+                            current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    project = db.query(Project).filter(Project.id == str(project_id), Project.owner_id == current_user.id).first()
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    items, refs = generate_from_description(project, description)
+    created = []
+    for it in items:
+        row = TakeoffItem(
+            project_id=str(project.id),
+            description=it["description"],
+            category=it["category"],
+            quantity=it["quantity"],
+            unit=it["unit"],
+            unit_cost=it["unit_cost"],
+            labor_hours=it["labor_hours"],
+            is_auto_generated=it.get("is_auto_generated", False),
+            notes=it.get("notes"),
+        )
+        db.add(row)
+        created.append(row)
+    db.commit()
+    for r in created:
+        db.refresh(r)
+    return {
+        "items": [_to_response(r).model_dump() for r in created],
+        "nec_references": refs,
+        "count": len(created),
+    }
 
 
 @router.delete("/{item_id}")
