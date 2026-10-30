@@ -1,11 +1,13 @@
 import os
 
 from fastapi import APIRouter, Depends, Query
+from sqlalchemy.orm import Session
 
 from app.auth.deps import get_current_user
+from app.database import SessionLocal, get_db
+from app.models import NECChunk
 
 NEC_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "nec_2017.txt")
-# fallbacks
 if not os.path.exists(NEC_PATH):
     NEC_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "..", "backend", "data", "nec_2017.txt")
 if not os.path.exists(NEC_PATH):
@@ -14,15 +16,69 @@ if not os.path.exists(NEC_PATH):
 _text_cache = None
 
 
-def load_text():
+def _read_file() -> str:
+    try:
+        with open(NEC_PATH, "r", encoding="utf-8", errors="ignore") as f:
+            return f.read()
+    except Exception:
+        return ""
+
+
+def seed_nec_chunks(db: Session | None = None, chunk_size: int = 4000) -> int:
+    """Ingest the full NEC 2017 text into nec_chunks if empty. Returns number inserted."""
+    own = db is None
+    if own:
+        db = SessionLocal()
+    try:
+        if db.query(NECChunk).count() > 0:
+            return 0
+        text = _read_file()
+        if not text:
+            return 0
+        # fixed-size chunks, break at newline when possible
+        chunks = []
+        i = 0
+        n = len(text)
+        while i < n:
+            end = min(i + chunk_size, n)
+            if end < n:
+                nl = text.rfind(chr(10), i, end)
+                if nl > i + chunk_size // 2:
+                    end = nl + 1
+            chunks.append(text[i:end].strip())
+            i = end
+        chunks = [c for c in chunks if c]
+        for i, c in enumerate(chunks):
+            db.add(NECChunk(chunk_index=i, content=c))
+        db.commit()
+        return len(chunks)
+    finally:
+        if own:
+            db.close()
+
+
+def load_text() -> str:
     global _text_cache
-    if _text_cache is None:
-        try:
-            with open(NEC_PATH, "r", encoding="utf-8", errors="ignore") as f:
-                _text_cache = f.read()
-        except Exception:
-            _text_cache = ""
+    if _text_cache is not None:
+        return _text_cache
+    # try DB first
+    try:
+        db = SessionLocal()
+        rows = db.query(NECChunk).order_by(NECChunk.chunk_index).all()
+        db.close()
+        if rows:
+            _text_cache = "\n\n".join(r.content for r in rows)
+            return _text_cache
+    except Exception as e:
+        print("NEC DB load failed:", e)
+    # fallback to file
+    _text_cache = _read_file()
     return _text_cache
+
+
+def invalidate_cache():
+    global _text_cache
+    _text_cache = None
 
 
 router = APIRouter(prefix="/nec", tags=["nec-reference"])
@@ -67,6 +123,13 @@ def search(q: str = Query(..., min_length=2), limit: int = 10, user=Depends(get_
         suffix = "…" if e < len(text) else ""
         results.append({"position": idx, "snippet": prefix + snippet + suffix})
     return {"query": q, "count": len(positions), "results": results}
+
+
+@router.post("/seed")
+def seed_endpoint(user=Depends(get_current_user), db: Session = Depends(get_db)):
+    n = seed_nec_chunks(db)
+    invalidate_cache()
+    return {"inserted": n, "total_chunks": db.query(NECChunk).count()}
 
 
 @router.get("/tables/220.42")

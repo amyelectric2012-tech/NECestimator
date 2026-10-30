@@ -100,6 +100,14 @@ class Material(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
 
+class NECChunk(Base):
+    __tablename__ = "nec_chunks"
+    __table_args__ = (Index("ix_nec_chunks_chunk_index", "chunk_index"),)
+    id = Column(UUID(as_uuid=False), primary_key=True, default=gen_uuid)
+    chunk_index = Column(Integer, nullable=False)
+    content = Column(Text, nullable=False)
+
+
 class LaborRate(Base):
     __tablename__ = "labor_rates"
     id = Column(UUID(as_uuid=False), primary_key=True, default=gen_uuid)

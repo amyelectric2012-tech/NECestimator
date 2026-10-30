@@ -39,7 +39,7 @@ Docker: `docker-compose up --build` (API :8000). Dockerfile builds frontend then
 - List endpoints return `X-Total-Count` header (pagination via `limit`/`offset`).
 - Security headers middleware + `robots.txt` (authenticated app). CORS allows all origins.
 - All PDFs state "Preliminary — Not for Construction".
-- NEC full text: `backend/data/nec_2017.txt`.
+- NEC full text: `backend/data/nec_2017.txt`; ingested into `nec_chunks` table via `seed_nec.py` (auto-seeded on startup). `/nec/seed` triggers re-ingest.
 
 ## Gotchas
 

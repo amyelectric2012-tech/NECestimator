@@ -101,6 +101,7 @@ jobs:
           cd backend
           python -m alembic upgrade head
           python seed.py
+          python seed_nec.py
           python seed_examples.py
       - name: Start backend
         env:
