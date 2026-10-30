@@ -325,6 +325,18 @@ export default function App() {
                     alert(`Generated ${d.length} takeoff items`);
                   } catch (e: any) { setError(e.message); }
                 }}>Generate Takeoff Items</button>
+                <button className="btn" disabled={busy} onClick={async () => {
+                  if (!selected || busy) return;
+                  setBusy(true);
+                  try {
+                    const r = await fetch(`${API}/projects/${selected.id}/estimate-from-takeoff`, { method: "POST", headers: { Authorization: `Bearer ${token}` } });
+                    if (!r.ok) throw new Error(await r.text());
+                    const blob = await r.blob();
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement("a"); a.href = url; a.download = `${selected.name}_estimate.pdf`; a.click();
+                  } catch (e: any) { setError(e.message); }
+                  finally { setBusy(false); }
+                }}>Generate Client Estimate (PDF)</button>
               </div>
               <div className="row" style={{ marginBottom: 8 }}>
                 <label style={{ fontSize: 13 }}>Client:</label>
