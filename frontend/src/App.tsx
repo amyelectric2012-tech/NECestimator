@@ -97,6 +97,7 @@ export default function App() {
       await api("/clients", { method: "POST", body: JSON.stringify(newClient) });
       setNewClient({ name: "", email: "", phone: "", address: "" });
       loadClients();
+      alert("Client added");
     } catch (e: any) { setError(e.message); }
   }
   async function linkClientToProject(clientId: string) {
@@ -281,7 +282,15 @@ export default function App() {
               <h3>{selected.name} <span className="badge">{selected.project_type}</span></h3>
               <div className="row" style={{ marginBottom: 8 }}>
                 <button className="btn" onClick={runCalc}>Run Calculation</button>
-                <button className="btn secondary" onClick={runTakeoff}>Generate Takeoff</button>
+                <button className="btn secondary" onClick={runTakeoff}>Generate Takeoff (Legacy)</button>
+                <button className="btn" onClick={async () => {
+                  if (!selected) return;
+                  try {
+                    const d = await api(`/projects/${selected.id}/takeoff-items/generate?floor_area_sqft=${selected.floor_area_sqft || 1500}`, { method: "POST" });
+                    await api(`/projects/${selected.id}/takeoff-items/`);
+                    alert(`Generated ${d.length} takeoff items`);
+                  } catch (e: any) { setError(e.message); }
+                }}>Generate Takeoff Items</button>
               </div>
               <div className="row" style={{ marginBottom: 8 }}>
                 <label style={{ fontSize: 13 }}>Client:</label>
