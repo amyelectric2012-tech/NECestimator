@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 
 const API = window.location.port === "5173" ? "http://localhost:8000" : "";
 
@@ -49,10 +49,13 @@ export default function App() {
   const [workDesc, setWorkDesc] = useState("");
   const [workDescResult, setWorkDescResult] = useState<any>(null);
   const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
   const [newProj, setNewProj] = useState({ name: "", type: "single_family", area: "1500" });
+  const chatRef = useRef<HTMLDivElement>(null);
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { if (token) { loadProjects(); loadClients(); } }, [token]);
+  useEffect(() => { if (chatRef.current) chatRef.current.scrollTop = chatRef.current.scrollHeight; }, [chatHistory]);
 
   async function api(path: string, opts: any = {}) {
     const r = await fetch(`${API}${path}`, {
@@ -93,12 +96,15 @@ export default function App() {
     catch (e: any) { setError(e.message); }
   }
   async function createClient() {
+    if (busy) return;
+    setBusy(true);
     try {
       await api("/clients", { method: "POST", body: JSON.stringify(newClient) });
       setNewClient({ name: "", email: "", phone: "", address: "" });
       loadClients();
       alert("Client added");
     } catch (e: any) { setError(e.message); }
+    finally { setBusy(false); }
   }
   async function linkClientToProject(clientId: string) {
     if (!selected) return;
@@ -111,8 +117,19 @@ export default function App() {
   }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { if (token) loadProjects(); }, [filterType, filterStatus]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (!token || projects.length === 0) return;
+    const id = new URLSearchParams(window.location.search).get("project");
+    if (id && !selected) {
+      const p = projects.find((x: any) => x.id === id);
+      if (p) selectProject(p);
+    }
+  }, [projects, token]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function createProject() {
+    if (busy) return;
+    setBusy(true);
     try {
       await api("/projects", { method: "POST", body: JSON.stringify({
         name: newProj.name, project_type: newProj.type, floor_area_sqft: parseFloat(newProj.area),
@@ -124,34 +141,43 @@ export default function App() {
       setNewProj({ name: "", type: "single_family", area: "1500" });
       loadProjects();
     } catch (e: any) { setError(e.message); }
+    finally { setBusy(false); }
   }
 
   async function selectProject(p: any) {
     setSelected(p); setCalc(null); setTakeoff(null); setChatHistory([]);
+    const url = new URL(window.location.href);
+    url.searchParams.set("project", p.id);
+    window.history.replaceState({}, "", url);
     try {
       const lc = await api(`/projects/${p.id}/load-calc`);
       setCalc(lc);
     } catch {}
   }
   async function runCalc() {
-    if (!selected) return;
+    if (!selected || busy) return;
+    setBusy(true);
     try { const d = await api(`/projects/${selected.id}/calculate`, { method: "POST" }); setCalc({ project_id: selected.id, calculations: Object.fromEntries(Object.entries(d.results).map(([k, v]) => [k, { results: v }])) }); }
     catch (e: any) { setError(e.message); }
+    finally { setBusy(false); }
   }
   async function runTakeoff() {
-    if (!selected) return;
+    if (!selected || busy) return;
+    setBusy(true);
     try { const d = await api(`/projects/${selected.id}/takeoff`, { method: "POST" }); setTakeoff(d); }
     catch (e: any) { setError(e.message); }
+    finally { setBusy(false); }
   }
   async function generateFromDescription() {
-    if (!selected || !workDesc.trim()) return;
+    if (!selected || !workDesc.trim() || busy) return;
+    setBusy(true);
     try {
       const d = await api(`/projects/${selected.id}/takeoff-items/from-description`, { method: "POST", body: JSON.stringify({ description: workDesc }) });
       setWorkDescResult(d);
-      // refresh takeoff summary
       const s = await api(`/projects/${selected.id}/takeoff-items/`);
       if (takeoff) setTakeoff({ ...takeoff, line_items: s.items, total_materials: s.total_material_cost, total_labor_hours: s.total_labor_hours, total_cost: s.grand_total });
     } catch (e: any) { setError(e.message); }
+    finally { setBusy(false); }
   }
   async function saveTakeoff() {
     if (!selected || !takeoff) return;
@@ -183,16 +209,17 @@ export default function App() {
     } catch (e: any) { setError(e.message); }
   }
   async function sendChat() {
-    if (!selected || !chatInput.trim()) return;
+    if (!selected || !chatInput.trim() || busy) return;
     const msg = chatInput.trim();
     setChatHistory(h => [...h, { role: "user", text: msg }]);
     setChatInput("");
+    setBusy(true);
     try {
       const d = await api(`/projects/${selected.id}/chat`, { method: "POST", body: JSON.stringify({ message: msg }) });
       setChatHistory(h => [...h, { role: "assistant", text: d.reply }]);
     } catch (e: any) {
       setChatHistory(h => [...h, { role: "assistant", text: `Error: ${e.message}` }]);
-    }
+    } finally { setBusy(false); }
   }
 
   if (!token) {
@@ -218,6 +245,13 @@ export default function App() {
   return (
     <div className="app"><style>{css}</style>
       <h1>Electrical Estimator</h1>
+      {error && (
+        <div style={{ position: "fixed", top: 12, right: 12, background: "#dc2626", color: "#fff", padding: "10px 14px", borderRadius: 6, zIndex: 1000, maxWidth: 360, boxShadow: "0 2px 8px rgba(0,0,0,0.2)" }}>
+          <span>{error}</span>
+          <button onClick={() => setError("")} style={{ marginLeft: 10, background: "transparent", border: "none", color: "#fff", cursor: "pointer", fontWeight: "bold" }}>×</button>
+        </div>
+      )}
+      {busy && <div style={{ position: "fixed", top: 12, left: 12, background: "#2563eb", color: "#fff", padding: "6px 12px", borderRadius: 6, zIndex: 1000, fontSize: 12 }}>Working…</div>}
       <div className="tabs">
         {["projects", "clients", "nec"].map(t => (
           <div key={t} className={`tab ${tab === t ? "active" : ""}`} onClick={() => setTab(t)}>{t.toUpperCase()}</div>
@@ -254,7 +288,7 @@ export default function App() {
                 <option value="adu">ADU</option>
               </select>
               <input value={newProj.area} onChange={e => setNewProj({ ...newProj, area: e.target.value })} placeholder="sqft" style={{ width: 80 }} />
-              <button className="btn" onClick={createProject}>Create</button>
+              <button className="btn" onClick={createProject} disabled={busy}>Create</button>
             </div>
           </div>
 
@@ -281,8 +315,8 @@ export default function App() {
             <div className="card">
               <h3>{selected.name} <span className="badge">{selected.project_type}</span></h3>
               <div className="row" style={{ marginBottom: 8 }}>
-                <button className="btn" onClick={runCalc}>Run Calculation</button>
-                <button className="btn secondary" onClick={runTakeoff}>Generate Takeoff (Legacy)</button>
+                <button className="btn" onClick={runCalc} disabled={busy}>Run Calculation</button>
+                <button className="btn secondary" onClick={runTakeoff} disabled={busy}>Generate Takeoff (Legacy)</button>
                 <button className="btn" onClick={async () => {
                   if (!selected) return;
                   try {
@@ -304,7 +338,7 @@ export default function App() {
               <h4 style={{ marginTop: 12 }}>Estimate from Work Description</h4>
               <textarea value={workDesc} onChange={e => setWorkDesc(e.target.value)} placeholder="Describe the work, e.g. 'Install 100A service, 20 duplex receptacles, 8 switches, GFCI in kitchen, smoke detectors' (reference NEC articles like 210.8)" style={{ width: "100%" }} rows={3} />
               <div className="row" style={{ marginTop: 8 }}>
-                <button className="btn" onClick={generateFromDescription}>Generate Estimate</button>
+                <button className="btn" onClick={generateFromDescription} disabled={busy}>Generate Estimate</button>
               </div>
               {workDescResult && (
                 <div style={{ marginTop: 8, fontSize: 13 }}>
@@ -370,7 +404,7 @@ export default function App() {
                           <td><input type="number" step="0.01" value={li.unit_cost} onChange={e => { const x = [...takeoff.line_items]; x[i].unit_cost = parseFloat(e.target.value) || 0; setTakeoff({ ...takeoff, line_items: x }); }} style={{ width: 70 }} /></td>
                           <td className="right">{(li.qty * li.unit_cost).toFixed(2)}</td>
                           <td><input type="number" step="0.01" value={li.labor_hours} onChange={e => { const x = [...takeoff.line_items]; x[i].labor_hours = parseFloat(e.target.value) || 0; setTakeoff({ ...takeoff, line_items: x }); }} style={{ width: 60 }} /></td>
-                          <td><button className="btn danger sm" onClick={() => { const x = takeoff.line_items.filter((_: any, j: number) => j !== i); setTakeoff({ ...takeoff, line_items: x }); }}>x</button></td>
+                          <td><button className="btn danger sm" onClick={() => { if (!confirm("Delete this item?")) return; const x = takeoff.line_items.filter((_: any, j: number) => j !== i); setTakeoff({ ...takeoff, line_items: x }); }}>x</button></td>
                         </tr>
                       ))}
                     </tbody>
@@ -392,7 +426,7 @@ export default function App() {
               )}
 
               <h4 style={{ marginTop: 12 }}>Estimator Chat</h4>
-              <div style={{ border: "1px solid #e5e7eb", borderRadius: 6, padding: 8, maxHeight: 240, overflowY: "auto", background: "#fafafa" }}>
+              <div ref={chatRef} style={{ border: "1px solid #e5e7eb", borderRadius: 6, padding: 8, maxHeight: 240, overflowY: "auto", background: "#fafafa" }}>
                 {chatHistory.length === 0 && <p style={{ color: "#6b7280", fontSize: 13 }}>Type 'help' for commands. Try "generate takeoff", "add 5 duplex receptacles", "summary".</p>}
                 {chatHistory.map((m, i) => (
                   <div key={i} style={{ marginBottom: 6, textAlign: m.role === "user" ? "right" : "left" }}>
@@ -402,7 +436,7 @@ export default function App() {
               </div>
               <div className="row" style={{ marginTop: 8 }}>
                 <input value={chatInput} onChange={e => setChatInput(e.target.value)} onKeyDown={e => e.key === "Enter" && sendChat()} placeholder="Message the estimator..." style={{ flex: 1 }} />
-                <button className="btn" onClick={sendChat}>Send</button>
+                <button className="btn" onClick={sendChat} disabled={busy}>Send</button>
               </div>
             </div>
           )}
@@ -417,7 +451,7 @@ export default function App() {
             <input value={newClient.email} onChange={e => setNewClient({ ...newClient, email: e.target.value })} placeholder="Email" />
             <input value={newClient.phone} onChange={e => setNewClient({ ...newClient, phone: e.target.value })} placeholder="Phone" />
             <input value={newClient.address} onChange={e => setNewClient({ ...newClient, address: e.target.value })} placeholder="Address" />
-            <button className="btn" onClick={createClient}>Add Client</button>
+            <button className="btn" onClick={createClient} disabled={busy}>Add Client</button>
           </div>
           <table>
             <thead><tr><th>Name</th><th>Email</th><th>Phone</th><th>Address</th></tr></thead>
@@ -475,7 +509,6 @@ export default function App() {
         </div>
       )}
 
-      {error && <p style={{ color: "red" }}>{error}</p>}
     </div>
   );
 }
