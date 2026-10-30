@@ -427,7 +427,7 @@ export default function App() {
 
               <h4 style={{ marginTop: 12 }}>Estimator Chat</h4>
               <div ref={chatRef} style={{ border: "1px solid #e5e7eb", borderRadius: 6, padding: 8, maxHeight: 240, overflowY: "auto", background: "#fafafa" }}>
-                {chatHistory.length === 0 && <p style={{ color: "#6b7280", fontSize: 13 }}>Type 'help' for commands. Try "generate takeoff", "add 5 duplex receptacles", "summary".</p>}
+                {chatHistory.length === 0 && <p style={{ color: "#6b7280", fontSize: 13 }}>Type 'help' for commands. Try "nec grounding", "describe install 5 receptacles", "generate takeoff", "summary".</p>}
                 {chatHistory.map((m, i) => (
                   <div key={i} style={{ marginBottom: 6, textAlign: m.role === "user" ? "right" : "left" }}>
                     <span style={{ display: "inline-block", padding: "4px 8px", borderRadius: 6, background: m.role === "user" ? "#2563eb" : "#e5e7eb", color: m.role === "user" ? "#fff" : "#111", fontSize: 13, whiteSpace: "pre-wrap" }}>{m.text}</span>
