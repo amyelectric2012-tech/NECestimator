@@ -22,6 +22,7 @@ th { background: #f3f4f6; font-weight: 600; }
 .tab.active { background: #fff; font-weight: 600; }
 h1,h2,h3 { margin: 8px 0; }
 .badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 11px; background: #e0e7ff; color: #3730a3; }
+mark { background: #fef08a; color: #1a1a2e; padding: 0 2px; border-radius: 2px; }
 
 @media (max-width: 640px) { table { font-size: 11px; } .row { flex-direction: column; align-items: stretch; } input { width: 100%; } }
 `;
@@ -423,7 +424,7 @@ export default function App() {
               {necResults.results ? (
                 necResults.results.map((r: any, i: number) => (
                   <div key={i} style={{ padding: 8, borderBottom: "1px solid #e5e7eb", fontSize: 13 }}>
-                    {r.snippet || JSON.stringify(r)}
+                    <div dangerouslySetInnerHTML={{ __html: r.snippet || "" }} />
                   </div>
                 ))
               ) : (

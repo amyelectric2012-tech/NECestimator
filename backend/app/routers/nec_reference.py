@@ -53,13 +53,19 @@ def search(q: str = Query(..., min_length=2), limit: int = 10, user=Depends(get_
             break
         positions.append(idx)
         start = idx + len(q)
+    import re as _re
     results = []
     for idx in positions[:limit]:
-        s = max(0, idx - 200)
-        e = min(len(text), idx + len(q) + 400)
+        s = max(0, idx - 240)
+        e = min(len(text), idx + len(q) + 480)
         snippet = text[s:e].replace("\n", " ")
-        snippet = snippet.replace(q, f"**{q}**") if q in snippet else snippet
-        results.append({"position": idx, "snippet": snippet})
+        snippet = _re.sub(r"\s{2,}", " ", snippet)
+        def _hl(m):
+            return f"<mark>{m.group(0)}</mark>"
+        snippet = _re.sub(_re.escape(q), _hl, snippet, flags=_re.IGNORECASE)
+        prefix = "…" if s > 0 else ""
+        suffix = "…" if e < len(text) else ""
+        results.append({"position": idx, "snippet": prefix + snippet + suffix})
     return {"query": q, "count": len(positions), "results": results}
 
 
