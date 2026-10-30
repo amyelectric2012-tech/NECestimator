@@ -437,7 +437,7 @@ export default function App() {
                 </>
               )}
 
-              <h4 style={{ marginTop: 12 }}>Estimator Chat</h4>
+              <h4 style={{ marginTop: 12 }}>Estimator Chat (main)</h4>
               <div ref={chatRef} style={{ border: "1px solid #e5e7eb", borderRadius: 6, padding: 8, maxHeight: 240, overflowY: "auto", background: "#fafafa" }}>
                 {chatHistory.length === 0 && <p style={{ color: "#6b7280", fontSize: 13 }}>Type 'help' for commands. Try "nec grounding", "describe install 5 receptacles", "generate takeoff", "summary".</p>}
                 {chatHistory.map((m, i) => (

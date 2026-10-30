@@ -106,13 +106,19 @@ def generate_pdf(project, estimate, load_calcs) -> str:
 
     # Cost summary
     story.append(Paragraph("Cost Summary", h))
+    labor_rate = getattr(project, "labor_rate", None)
+    try:
+        labor_rate = float(labor_rate) if labor_rate is not None else 85.0
+    except (TypeError, ValueError):
+        labor_rate = 85.0
+    labor_cost = estimate.total_labor_hours * labor_rate
     summary = [
         ["Materials", f"${estimate.total_materials:,.2f}"],
+        ["Labor", f"${labor_cost:,.2f} ({estimate.total_labor_hours:,.2f} hrs @ ${labor_rate:.2f}/hr)"],
         [f"Markup ({estimate.markup_pct*100:.0f}%)", ""],
         [f"Contingency ({estimate.contingency_pct*100:.0f}%)", ""],
         [f"Tax ({estimate.tax_pct*100:.0f}%)", ""],
-        ["Total (materials + markup + tax)", f"${estimate.total_cost:,.2f}"],
-        ["Total labor hours", f"{estimate.total_labor_hours:,.2f}"],
+        ["Grand Total", f"${estimate.total_cost:,.2f}"],
     ]
     # labor summary
     if estimate.labor_summary:
@@ -149,6 +155,21 @@ def generate_pdf(project, estimate, load_calcs) -> str:
             story.append(Paragraph(f"• {a}", small))
     story.append(Spacer(1, 8))
     story.append(Paragraph("NEC notes: " + "; ".join(load_calcs.get("standard", {}).get("results", {}).get("notes", []) if isinstance(load_calcs.get("standard"), dict) else []), small))
+    story.append(Spacer(1, 8))
+    story.append(Paragraph("NEC 2017 References", h))
+    for ref in [
+        "Art. 220.12 – Lighting load (3 VA/sqft)",
+        "Table 220.42 – Lighting demand factors",
+        "220.14 – Small-appliance & laundry loads",
+        "Table 220.54 – Dryer demand",
+        "Table 220.55 – Range demand",
+        "220.60 – Noncoincident loads",
+        "220.50/220.18 – Motor loads",
+        "Art. 250 – Grounding & bonding",
+        "Art. 310 – Conductor sizing",
+        "Art. 210.8 / 210.12 – GFCI & AFCI",
+    ]:
+        story.append(Paragraph(f"• {ref}", small))
 
     doc.build(story)
     return path
