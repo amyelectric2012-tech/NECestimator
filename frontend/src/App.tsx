@@ -51,6 +51,8 @@ export default function App() {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [newProj, setNewProj] = useState({ name: "", type: "single_family", area: "1500" });
+  const [workEst, setWorkEst] = useState({ name: "", area: "1500", description: "" });
+  const [showWorkEst, setShowWorkEst] = useState(false);
   const chatRef = useRef<HTMLDivElement>(null);
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -276,6 +278,38 @@ export default function App() {
               </select>
               <button className="btn secondary sm" onClick={logout}>Logout</button>
             </div>
+          </div>
+
+          <div className="card">
+            <h3>Estimate from Work Description</h3>
+            {!showWorkEst ? (
+              <button className="btn" onClick={() => setShowWorkEst(true)}>New Estimate from Work</button>
+            ) : (
+              <div>
+                <div className="row">
+                  <input value={workEst.name} onChange={e => setWorkEst({ ...workEst, name: e.target.value })} placeholder="Project name" />
+                  <input value={workEst.area} onChange={e => setWorkEst({ ...workEst, area: e.target.value })} placeholder="sqft" style={{ width: 80 }} />
+                </div>
+                <textarea value={workEst.description} onChange={e => setWorkEst({ ...workEst, description: e.target.value })} placeholder="Describe the work, e.g. 'Install 100A service, 20 duplex receptacles, 8 switches'" style={{ width: "100%", marginTop: 8 }} rows={3} />
+                <div className="row" style={{ marginTop: 8 }}>
+                  <button className="btn" disabled={busy} onClick={async () => {
+                    if (busy) return;
+                    setBusy(true);
+                    try {
+                      const proj = await api("/projects", { method: "POST", body: JSON.stringify({ name: workEst.name || "Work Estimate", project_type: "single_family", floor_area_sqft: parseFloat(workEst.area) || 1500, num_units: 1, small_appliance_circuits: 2, laundry_circuits: 1, appliances: [{ name: "water_heater", va: 4500, fastened: true }], range_count: 1, range_kw_each: 8, dryer_count: 1, dryer_kw_each: 5, hvac: { cooling_va: 3000, heating_va: 0 }, largest_motor_va: 3000 }) });
+                      await api(`/projects/${proj.id}/takeoff-items/from-description`, { method: "POST", body: JSON.stringify({ description: workEst.description }) });
+                      setShowWorkEst(false);
+                      setWorkEst({ name: "", area: "1500", description: "" });
+                      await loadProjects();
+                      selectProject(proj);
+                      alert("Estimate created from work description");
+                    } catch (e: any) { setError(e.message); }
+                    finally { setBusy(false); }
+                  }}>Create Estimate</button>
+                  <button className="btn secondary" onClick={() => setShowWorkEst(false)}>Cancel</button>
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="card">
