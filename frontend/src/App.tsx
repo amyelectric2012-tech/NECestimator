@@ -41,11 +41,13 @@ export default function App() {
   const [necResults, setNecResults] = useState<any>(null);
   const [chatInput, setChatInput] = useState("");
   const [chatHistory, setChatHistory] = useState<{ role: string; text: string }[]>([]);
+  const [clients, setClients] = useState<any[]>([]);
+  const [newClient, setNewClient] = useState({ name: "", email: "", phone: "", address: "" });
   const [error, setError] = useState("");
   const [newProj, setNewProj] = useState({ name: "", type: "single_family", area: "1500" });
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { if (token) loadProjects(); }, [token]);
+  useEffect(() => { if (token) { loadProjects(); loadClients(); } }, [token]);
 
   async function api(path: string, opts: any = {}) {
     const r = await fetch(`${API}${path}`, {
@@ -79,6 +81,26 @@ export default function App() {
       if (filterStatus) qs.set("status", filterStatus);
       const d = await api(`/projects?${qs}`);
       setProjects(d);
+    } catch (e: any) { setError(e.message); }
+  }
+  async function loadClients() {
+    try { setClients(await api("/clients")); }
+    catch (e: any) { setError(e.message); }
+  }
+  async function createClient() {
+    try {
+      await api("/clients", { method: "POST", body: JSON.stringify(newClient) });
+      setNewClient({ name: "", email: "", phone: "", address: "" });
+      loadClients();
+    } catch (e: any) { setError(e.message); }
+  }
+  async function linkClientToProject(clientId: string) {
+    if (!selected) return;
+    try {
+      await api(`/projects/${selected.id}`, { method: "PATCH", body: JSON.stringify({ client_id: clientId || null }) });
+      const updated = await api(`/projects/${selected.id}`);
+      setSelected(updated);
+      loadProjects();
     } catch (e: any) { setError(e.message); }
   }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -174,7 +196,7 @@ export default function App() {
     <div className="app"><style>{css}</style>
       <h1>Electrical Estimator</h1>
       <div className="tabs">
-        {["projects", "nec"].map(t => (
+        {["projects", "clients", "nec"].map(t => (
           <div key={t} className={`tab ${tab === t ? "active" : ""}`} onClick={() => setTab(t)}>{t.toUpperCase()}</div>
         ))}
       </div>
@@ -238,6 +260,14 @@ export default function App() {
               <div className="row" style={{ marginBottom: 8 }}>
                 <button className="btn" onClick={runCalc}>Run Calculation</button>
                 <button className="btn secondary" onClick={runTakeoff}>Generate Takeoff</button>
+              </div>
+              <div className="row" style={{ marginBottom: 8 }}>
+                <label style={{ fontSize: 13 }}>Client:</label>
+                <select value={selected.client_id || ""} onChange={e => linkClientToProject(e.target.value)}>
+                  <option value="">— none —</option>
+                  {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+                {selected.client_id && <span className="badge">{clients.find(c => c.id === selected.client_id)?.name}</span>}
               </div>
 
               {std && (
@@ -327,6 +357,29 @@ export default function App() {
             </div>
           )}
         </>
+      )}
+
+      {tab === "clients" && (
+        <div className="card">
+          <h3>Clients ({clients.length})</h3>
+          <div className="row" style={{ marginBottom: 8 }}>
+            <input value={newClient.name} onChange={e => setNewClient({ ...newClient, name: e.target.value })} placeholder="Name" />
+            <input value={newClient.email} onChange={e => setNewClient({ ...newClient, email: e.target.value })} placeholder="Email" />
+            <input value={newClient.phone} onChange={e => setNewClient({ ...newClient, phone: e.target.value })} placeholder="Phone" />
+            <input value={newClient.address} onChange={e => setNewClient({ ...newClient, address: e.target.value })} placeholder="Address" />
+            <button className="btn" onClick={createClient}>Add Client</button>
+          </div>
+          <table>
+            <thead><tr><th>Name</th><th>Email</th><th>Phone</th><th>Address</th></tr></thead>
+            <tbody>
+              {clients.map(c => (
+                <tr key={c.id}>
+                  <td>{c.name}</td><td>{c.email}</td><td>{c.phone}</td><td>{c.address}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
 
       {tab === "nec" && (

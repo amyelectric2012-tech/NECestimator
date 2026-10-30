@@ -65,6 +65,7 @@ class ProjectUpdate(BaseModel):
     hvac: dict[str, Any] | None = None
     largest_motor_va: float | None = None
     existing_service_amps: float | None = None
+    client_id: str | None = None
 
 
 class ProjectOut(BaseModel):
@@ -87,6 +88,7 @@ class ProjectOut(BaseModel):
     hvac: dict[str, Any] = {}
     largest_motor_va: float
     existing_service_amps: float | None = None
+    client_id: str | None = None
     owner_id: str
     created_at: datetime
     updated_at: datetime
