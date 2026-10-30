@@ -4,10 +4,12 @@ from fastapi import APIRouter, Depends, Query
 
 from app.auth.deps import get_current_user
 
-NEC_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "..", "(NFPA) National Fire Protection Association-National Electrical Code 2017.txt")
-# fallback absolute
+NEC_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "nec_2017.txt")
+# fallbacks
 if not os.path.exists(NEC_PATH):
-    NEC_PATH = "/home/amram/NECestimator/(NFPA) National Fire Protection Association-National Electrical Code 2017.txt"
+    NEC_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "..", "backend", "data", "nec_2017.txt")
+if not os.path.exists(NEC_PATH):
+    NEC_PATH = "/home/amram/NECestimator/backend/data/nec_2017.txt"
 
 _text_cache = None
 
@@ -24,6 +26,16 @@ def load_text():
 
 
 router = APIRouter(prefix="/nec", tags=["nec-reference"])
+
+
+@router.get("/content")
+def content(offset: int = 0, limit: int = 5000, user=Depends(get_current_user)):
+    text = load_text()
+    if not text:
+        return {"offset": offset, "limit": limit, "total": 0, "text": "", "error": "NEC text not loaded"}
+    total = len(text)
+    chunk = text[offset:offset + limit]
+    return {"offset": offset, "limit": limit, "total": total, "text": chunk}
 
 
 @router.get("/search")

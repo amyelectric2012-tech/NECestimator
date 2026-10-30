@@ -39,6 +39,8 @@ export default function App() {
   const [takeoff, setTakeoff] = useState<any>(null);
   const [necQuery, setNecQuery] = useState("");
   const [necResults, setNecResults] = useState<any>(null);
+  const [necContent, setNecContent] = useState<any>(null);
+  const [necOffset, setNecOffset] = useState(0);
   const [chatInput, setChatInput] = useState("");
   const [chatHistory, setChatHistory] = useState<{ role: string; text: string }[]>([]);
   const [clients, setClients] = useState<any[]>([]);
@@ -158,6 +160,13 @@ export default function App() {
   async function loadTable(t: string) {
     try { setNecResults(await api(`/nec/tables/${t}`)); }
     catch (e: any) { setError(e.message); }
+  }
+  async function loadNecContent(off: number = 0) {
+    try {
+      const d = await api(`/nec/content?offset=${off}&limit=8000`);
+      setNecContent(d);
+      setNecOffset(off);
+    } catch (e: any) { setError(e.message); }
   }
   async function sendChat() {
     if (!selected || !chatInput.trim()) return;
@@ -395,6 +404,20 @@ export default function App() {
             <button className="btn secondary sm" onClick={() => loadTable("220.55")}>Table 220.55</button>
             <button className="btn secondary sm" onClick={() => loadTable("220.84")}>Table 220.84</button>
           </div>
+          <div style={{ marginTop: 12 }}>
+            <button className="btn secondary sm" onClick={() => loadNecContent(0)}>Load Full NEC 2017 Text</button>
+            {necContent && (
+              <div style={{ marginTop: 8 }}>
+                <p style={{ fontSize: 12, color: "#6b7280" }}>Showing {necContent.offset}–{Math.min(necContent.offset + necContent.limit, necContent.total)} of {necContent.total} chars</p>
+                <pre style={{ background: "#f4f4f4", padding: 12, maxHeight: 400, overflow: "auto", fontSize: 12, whiteSpace: "pre-wrap" }}>{necContent.text}</pre>
+                <div className="row" style={{ marginTop: 8 }}>
+                  <button className="btn secondary sm" disabled={necOffset <= 0} onClick={() => loadNecContent(Math.max(0, necOffset - 8000))}>Prev</button>
+                  <button className="btn secondary sm" disabled={necOffset + 8000 >= necContent.total} onClick={() => loadNecContent(necOffset + 8000)}>Next</button>
+                </div>
+              </div>
+            )}
+          </div>
+
           {necResults && (
             <div style={{ marginTop: 12 }}>
               {necResults.results ? (
