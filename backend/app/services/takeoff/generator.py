@@ -140,7 +140,7 @@ def generate_takeoff_from_calculation(
         quantity=40,
         unit="ft",
         unit_cost=Decimal("2.40"),
-        labor_hours=round(40 / 40.0, 2),
+        labor_hours=round(1.0 / 40.0, 4),
         is_auto_generated=True,
         notes="Service entrance conduit run",
     ))
@@ -162,7 +162,7 @@ def generate_takeoff_from_calculation(
         quantity=branch_conduit_ft,
         unit="ft",
         unit_cost=Decimal("0.95"),
-        labor_hours=round(branch_conduit_ft / 60.0, 2),
+        labor_hours=round(1.0 / 60.0, 4),
         is_auto_generated=True,
         notes="Branch circuit conduit (rough estimate)",
     ))

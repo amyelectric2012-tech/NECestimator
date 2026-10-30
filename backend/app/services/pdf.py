@@ -104,6 +104,29 @@ def generate_pdf(project, estimate, load_calcs) -> str:
         story.append(t)
     story.append(Spacer(1, 8))
 
+    # Detailed labor & material breakdown
+    story.append(Paragraph("Detailed Labor & Material Breakdown", h))
+    ddata = [["Item", "Qty", "Mat. Cost", "Labor Hrs", "Labor Cost"]]
+    labor_rate = getattr(project, "labor_rate", None)
+    try:
+        labor_rate = float(labor_rate) if labor_rate is not None else 85.0
+    except (TypeError, ValueError):
+        labor_rate = 85.0
+    for li in items:
+        lh = float(li.get("labor_hours", 0) or 0) * float(li.get("qty", 0) or 0)
+        ddata.append([li.get("name", ""), str(li.get("qty", 0)),
+                     f"${li.get('line_total', 0):.2f}", f"{lh:.2f}", f"${lh * labor_rate:.2f}"])
+    ddata.append(["", "", f"${estimate.total_materials:,.2f}", f"{estimate.total_labor_hours:,.2f}", f"${estimate.total_labor_hours * labor_rate:,.2f}"])
+    if len(ddata) > 2:
+        t = Table(ddata, colWidths=[2.4*inch, 0.5*inch, 0.9*inch, 0.8*inch, 0.9*inch])
+        t.setStyle(TableStyle([("BACKGROUND", (0, 0), (-1, 0), colors.lightgrey),
+                               ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
+                               ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                               ("FONTNAME", (0, -1), (-1, -1), "Helvetica-Bold"),
+                               ("ALIGN", (1, 0), (-1, -1), "RIGHT")]))
+        story.append(t)
+    story.append(Spacer(1, 8))
+
     # Cost summary
     story.append(Paragraph("Cost Summary", h))
     labor_rate = getattr(project, "labor_rate", None)
