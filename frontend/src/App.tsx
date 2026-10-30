@@ -39,6 +39,8 @@ export default function App() {
   const [takeoff, setTakeoff] = useState<any>(null);
   const [necQuery, setNecQuery] = useState("");
   const [necResults, setNecResults] = useState<any>(null);
+  const [chatInput, setChatInput] = useState("");
+  const [chatHistory, setChatHistory] = useState<{ role: string; text: string }[]>([]);
   const [error, setError] = useState("");
   const [newProj, setNewProj] = useState({ name: "", type: "single_family", area: "1500" });
 
@@ -97,7 +99,7 @@ export default function App() {
   }
 
   async function selectProject(p: any) {
-    setSelected(p); setCalc(null); setTakeoff(null);
+    setSelected(p); setCalc(null); setTakeoff(null); setChatHistory([]);
     try {
       const lc = await api(`/projects/${p.id}/load-calc`);
       setCalc(lc);
@@ -134,6 +136,18 @@ export default function App() {
   async function loadTable(t: string) {
     try { setNecResults(await api(`/nec/tables/${t}`)); }
     catch (e: any) { setError(e.message); }
+  }
+  async function sendChat() {
+    if (!selected || !chatInput.trim()) return;
+    const msg = chatInput.trim();
+    setChatHistory(h => [...h, { role: "user", text: msg }]);
+    setChatInput("");
+    try {
+      const d = await api(`/projects/${selected.id}/chat`, { method: "POST", body: JSON.stringify({ message: msg }) });
+      setChatHistory(h => [...h, { role: "assistant", text: d.reply }]);
+    } catch (e: any) {
+      setChatHistory(h => [...h, { role: "assistant", text: `Error: ${e.message}` }]);
+    }
   }
 
   if (!token) {
@@ -296,6 +310,20 @@ export default function App() {
                   <textarea value={takeoff.assumptions || ""} onChange={e => setTakeoff({ ...takeoff, assumptions: e.target.value })} placeholder="Assumptions" style={{ width: "100%", marginTop: 8 }} rows={3} />
                 </>
               )}
+
+              <h4 style={{ marginTop: 12 }}>Estimator Chat</h4>
+              <div style={{ border: "1px solid #e5e7eb", borderRadius: 6, padding: 8, maxHeight: 240, overflowY: "auto", background: "#fafafa" }}>
+                {chatHistory.length === 0 && <p style={{ color: "#6b7280", fontSize: 13 }}>Type 'help' for commands. Try "generate takeoff", "add 5 duplex receptacles", "summary".</p>}
+                {chatHistory.map((m, i) => (
+                  <div key={i} style={{ marginBottom: 6, textAlign: m.role === "user" ? "right" : "left" }}>
+                    <span style={{ display: "inline-block", padding: "4px 8px", borderRadius: 6, background: m.role === "user" ? "#2563eb" : "#e5e7eb", color: m.role === "user" ? "#fff" : "#111", fontSize: 13, whiteSpace: "pre-wrap" }}>{m.text}</span>
+                  </div>
+                ))}
+              </div>
+              <div className="row" style={{ marginTop: 8 }}>
+                <input value={chatInput} onChange={e => setChatInput(e.target.value)} onKeyDown={e => e.key === "Enter" && sendChat()} placeholder="Message the estimator..." style={{ flex: 1 }} />
+                <button className="btn" onClick={sendChat}>Send</button>
+              </div>
             </div>
           )}
         </>

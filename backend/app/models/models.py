@@ -32,6 +32,22 @@ class User(Base):
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     projects = relationship("Project", back_populates="owner")
+    clients = relationship("Client", back_populates="owner", cascade="all, delete-orphan")
+
+
+class Client(Base):
+    __tablename__ = "clients"
+    id = Column(UUID(as_uuid=False), primary_key=True, default=gen_uuid)
+    name = Column(String(255), nullable=False)
+    email = Column(String(255), nullable=True)
+    phone = Column(String(50), nullable=True)
+    address = Column(String(500), nullable=True)
+    notes = Column(Text, nullable=True)
+    owner_id = Column(UUID(as_uuid=False), ForeignKey("users.id"), nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    owner = relationship("User", back_populates="clients")
+    projects = relationship("Project", back_populates="client")
 
 
 class Project(Base):
@@ -57,10 +73,12 @@ class Project(Base):
     existing_service_amps = Column(Float, nullable=True)
     labor_rate = Column(Numeric(10, 2), default=85.00)
     contingency_percent = Column(Float, default=5.0)
+    client_id = Column(UUID(as_uuid=False), ForeignKey("clients.id"), nullable=True)
     owner_id = Column(UUID(as_uuid=False), ForeignKey("users.id"), nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     owner = relationship("User", back_populates="projects")
+    client = relationship("Client", back_populates="projects")
     load_calculations = relationship("LoadCalculation", back_populates="project", cascade="all, delete-orphan")
     estimates = relationship("Estimate", back_populates="project", cascade="all, delete-orphan")
 

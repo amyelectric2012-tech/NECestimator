@@ -12,6 +12,8 @@ from app.models import models  # noqa: F401
 from app.routers import (
     auth,
     calculations,
+    chat,
+    clients,
     estimates,
     export,
     materials,
@@ -58,6 +60,8 @@ app.include_router(export.router)
 app.include_router(nec_reference.router)
 app.include_router(calculations.router)
 app.include_router(takeoff.router)
+app.include_router(chat.router)
+app.include_router(clients.router)
 app.include_router(v1_calculations.router, prefix="/api/v1")
 
 
