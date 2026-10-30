@@ -7,6 +7,7 @@ from sqlalchemy import (
     DateTime,
     Float,
     ForeignKey,
+    Index,
     Numeric,
     String,
     Text,
@@ -22,6 +23,7 @@ def gen_uuid():
 
 class TakeoffItem(Base):
     __tablename__ = "takeoff_items"
+    __table_args__ = (Index("ix_takeoff_items_project_id", "project_id"),)
 
     id = Column(UUID(as_uuid=False), primary_key=True, default=gen_uuid)
     project_id = Column(UUID(as_uuid=False), ForeignKey("projects.id"), nullable=False)

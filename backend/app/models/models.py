@@ -8,6 +8,7 @@ from sqlalchemy import (
     DateTime,
     Float,
     ForeignKey,
+    Index,
     Integer,
     Numeric,
     String,
@@ -37,6 +38,7 @@ class User(Base):
 
 class Client(Base):
     __tablename__ = "clients"
+    __table_args__ = (Index("ix_clients_owner_id", "owner_id"),)
     id = Column(UUID(as_uuid=False), primary_key=True, default=gen_uuid)
     name = Column(String(255), nullable=False)
     email = Column(String(255), nullable=True)
@@ -52,6 +54,7 @@ class Client(Base):
 
 class Project(Base):
     __tablename__ = "projects"
+    __table_args__ = (Index("ix_projects_owner_id", "owner_id"), Index("ix_projects_status", "status"),)
     id = Column(UUID(as_uuid=False), primary_key=True, default=gen_uuid)
     name = Column(String(255), nullable=False)
     description = Column(Text, nullable=True)
@@ -117,6 +120,7 @@ class LoadCalculation(Base):
 
 class Estimate(Base):
     __tablename__ = "estimates"
+    __table_args__ = (Index("ix_estimates_project_id", "project_id"),)
     id = Column(UUID(as_uuid=False), primary_key=True, default=gen_uuid)
     project_id = Column(UUID(as_uuid=False), ForeignKey("projects.id"), nullable=False)
     name = Column(String(255), default="Bid")

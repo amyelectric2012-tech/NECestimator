@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy.orm import Session
 
 from app.auth.deps import get_current_user
@@ -12,8 +12,12 @@ router = APIRouter(prefix="/clients", tags=["Clients"])
 
 
 @router.get("", response_model=list[ClientOut])
-def list_clients(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    return db.query(Client).filter(Client.owner_id == current_user.id).all()
+def list_clients(response: Response, current_user: User = Depends(get_current_user), db: Session = Depends(get_db), limit: int = 50, offset: int = 0):
+    q = db.query(Client).filter(Client.owner_id == current_user.id)
+    total = q.count()
+    items = q.order_by(Client.created_at.desc()).offset(offset).limit(limit).all()
+    response.headers["X-Total-Count"] = str(total)
+    return items
 
 
 @router.post("", response_model=ClientOut)

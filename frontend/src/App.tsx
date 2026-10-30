@@ -371,6 +371,17 @@ export default function App() {
                   } catch (e: any) { setError(e.message); }
                   finally { setBusy(false); }
                 }}>Generate Client Estimate (PDF)</button>
+                <button className="btn secondary" disabled={busy} onClick={async () => {
+                  if (!selected || busy) return;
+                  const to = prompt("Send estimate to email:", selected.client_id ? (clients.find(c => c.id === selected.client_id)?.email || "") : "");
+                  if (!to) return;
+                  setBusy(true);
+                  try {
+                    await api(`/projects/${selected.id}/email-estimate`, { method: "POST", body: JSON.stringify({ to, subject: `Electrical Estimate - ${selected.name}`, body: "Please find your estimate attached." }) });
+                    alert(`Estimate emailed to ${to}`);
+                  } catch (e: any) { setError(e.message); }
+                  finally { setBusy(false); }
+                }}>Email Estimate to Client</button>
               </div>
               <div className="row" style={{ marginBottom: 8 }}>
                 <label style={{ fontSize: 13 }}>Client:</label>

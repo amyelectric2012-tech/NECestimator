@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy.orm import Session
 
 from app.auth.deps import get_current_user
@@ -40,11 +40,15 @@ def create_estimate(project_id: str, payload: EstimateCreate, db: Session = Depe
 
 
 @router.get("/{project_id}/estimates", response_model=list[EstimateOut])
-def list_estimates(project_id: str, db: Session = Depends(get_db), user=Depends(get_current_user)):
+def list_estimates(response: Response, project_id: str, db: Session = Depends(get_db), user=Depends(get_current_user), limit: int = 50, offset: int = 0):
     proj = db.query(Project).filter(Project.id == project_id, Project.owner_id == user.id).first()
     if not proj:
         raise HTTPException(status_code=404, detail="Project not found")
-    return db.query(Estimate).filter(Estimate.project_id == proj.id).order_by(Estimate.created_at.desc()).all()
+    q = db.query(Estimate).filter(Estimate.project_id == proj.id)
+    total = q.count()
+    items = q.order_by(Estimate.created_at.desc()).offset(offset).limit(limit).all()
+    response.headers["X-Total-Count"] = str(total)
+    return items
 
 
 @router.get("/{project_id}/estimates/{estimate_id}", response_model=EstimateOut)

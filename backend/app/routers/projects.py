@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy.orm import Session
 
 from app.auth.deps import get_current_user
@@ -57,13 +57,16 @@ def create_project(payload: ProjectCreate, db: Session = Depends(get_db), user=D
 
 
 @router.get("", response_model=list[ProjectOut])
-def list_projects(db: Session = Depends(get_db), user=Depends(get_current_user), status: str | None = None, project_type: str | None = None):
+def list_projects(response: Response, db: Session = Depends(get_db), user=Depends(get_current_user), status: str | None = None, project_type: str | None = None, limit: int = 50, offset: int = 0):
     q = db.query(Project).filter(Project.owner_id == user.id)
     if status:
         q = q.filter(Project.status == status)
     if project_type:
         q = q.filter(Project.project_type == project_type)
-    return q.order_by(Project.created_at.desc()).all()
+    total = q.count()
+    items = q.order_by(Project.created_at.desc()).offset(offset).limit(limit).all()
+    response.headers["X-Total-Count"] = str(total)
+    return items
 
 
 @router.get("/{project_id}", response_model=ProjectOut)

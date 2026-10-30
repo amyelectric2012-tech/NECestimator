@@ -1,7 +1,7 @@
 from decimal import Decimal
 from uuid import UUID
 
-from fastapi import APIRouter, Body, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, Body, Depends, File, HTTPException, Response, UploadFile
 from sqlalchemy.orm import Session
 
 from app.auth.deps import get_current_user
@@ -114,15 +114,21 @@ def generate_takeoff(project_id: UUID, floor_area_sqft: float = 1500.0,
 
 @router.get("/", response_model=TakeoffSummary)
 def get_takeoff(project_id: UUID, labor_rate: float | None = None, contingency_percent: float | None = None,
-                tax_percent: float = 0.0, current_user: User = Depends(get_current_user),
-                db: Session = Depends(get_db)):
+                tax_percent: float = 0.0, limit: int = 100, offset: int = 0,
+                current_user: User = Depends(get_current_user), db: Session = Depends(get_db), response: Response = None):
     project = db.query(Project).filter(Project.id == str(project_id), Project.owner_id == current_user.id).first()
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
     lr = labor_rate if labor_rate is not None else float(project.labor_rate or 85.0)
     cp = contingency_percent if contingency_percent is not None else float(project.contingency_percent or 5.0)
-    items = db.query(TakeoffItem).filter(TakeoffItem.project_id == str(project_id)).all()
-    return _summary(items, Decimal(str(lr)), cp, tax_percent)
+    all_items = db.query(TakeoffItem).filter(TakeoffItem.project_id == str(project_id)).all()
+    total = len(all_items)
+    summary = _summary(all_items, Decimal(str(lr)), cp, tax_percent)
+    # paginate items in response
+    summary.items = [_to_response(i) for i in all_items[offset:offset + limit]]
+    if response is not None:
+        response.headers["X-Total-Count"] = str(total)
+    return summary
 
 
 @router.post("/", response_model=TakeoffItemResponse)
