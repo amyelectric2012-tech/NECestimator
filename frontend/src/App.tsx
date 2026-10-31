@@ -60,7 +60,7 @@ export default function App() {
   useEffect(() => { if (token) { loadProjects(); loadClients(); } }, [token]);
   useEffect(() => { if (chatRef.current) chatRef.current.scrollTop = chatRef.current.scrollHeight; }, [chatHistory]);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { if (token && selected && tab === "estimates") loadEstimates(); }, [tab, selected, token]);
+  useEffect(() => { if (token && tab === "estimates") loadEstimates(); }, [tab, selected, token, projects]);
 
   async function api(path: string, opts: any = {}) {
     const r = await fetch(`${API}${path}`, {
@@ -101,10 +101,27 @@ export default function App() {
     catch (e: any) { setError(e.message); }
   }
   async function loadEstimates(pid?: string) {
-    if (!pid && !selected) return;
-    const id = pid || selected.id;
-    try { setEstimates(await api(`/projects/${id}/estimates`)); }
-    catch (e: any) { setError(e.message); }
+    if (pid) {
+      try { setEstimates((await api(`/projects/${pid}/estimates`)).map((e: any) => ({ ...e, project_id: pid, project_name: projects.find(p => p.id === pid)?.name || pid }))); }
+      catch (e: any) { setError(e.message); }
+      return;
+    }
+    if (selected) {
+      try { setEstimates((await api(`/projects/${selected.id}/estimates`)).map((e: any) => ({ ...e, project_id: selected.id, project_name: selected.name }))); }
+      catch (e: any) { setError(e.message); }
+      return;
+    }
+    // no project selected: aggregate across all projects
+    try {
+      const all: any[] = [];
+      for (const p of projects) {
+        try {
+          const es = await api(`/projects/${p.id}/estimates`);
+          for (const e of es) all.push({ ...e, project_id: p.id, project_name: p.name });
+        } catch {}
+      }
+      setEstimates(all);
+    } catch (e: any) { setError(e.message); }
   }
   async function createClient() {
     if (busy) return;
@@ -537,42 +554,47 @@ export default function App() {
 
       {tab === "estimates" && (
         <div className="card">
-          <h3>Saved Estimates {selected ? `— ${selected.name}` : ""}</h3>
-          {!selected && <p>Select a project first.</p>}
-          {selected && (
-            <>
-              <div className="row" style={{ marginBottom: 8 }}>
-                <button className="btn" onClick={() => loadEstimates()} disabled={busy}>Refresh</button>
-              </div>
-              <table>
-                <thead><tr><th>Name</th><th>Created</th><th>Materials</th><th>Labor Hrs</th><th>Total</th><th>Actions</th></tr></thead>
-                <tbody>
-                  {estimates.map(e => (
-                    <tr key={e.id}>
-                      <td>{e.name}</td>
-                      <td>{new Date(e.created_at).toLocaleDateString()}</td>
-                      <td className="right">${Number(e.total_materials || 0).toFixed(2)}</td>
-                      <td className="right">{Number(e.total_labor_hours || 0).toFixed(2)}</td>
-                      <td className="right">${Number(e.total_cost || 0).toFixed(2)}</td>
-                      <td>
-                        <button className="btn sm" onClick={async () => {
-                          const r = await fetch(`${API}/projects/${selected.id}/export-pdf?estimate_id=${e.id}`, { headers: { Authorization: `Bearer ${token}` } });
-                          const b = await r.blob(); const url = URL.createObjectURL(b);
-                          const a = document.createElement("a"); a.href = url; a.download = `${selected.name}_estimate.pdf`; a.click();
-                        }}>PDF</button>
-                        <button className="btn sm danger" style={{ marginLeft: 4 }} onClick={async () => {
-                          if (!confirm("Delete estimate?")) return;
-                          await api(`/projects/${selected.id}/estimates/${e.id}`, { method: "DELETE" });
-                          loadEstimates();
-                        }}>Delete</button>
-                      </td>
-                    </tr>
-                  ))}
-                  {estimates.length === 0 && <tr><td colSpan={6}>No estimates yet. Generate one from a project.</td></tr>}
-                </tbody>
-              </table>
-            </>
-          )}
+          <h3>Saved Estimates {selected ? `— ${selected.name}` : "— All Projects"}</h3>
+          <div className="row" style={{ marginBottom: 8 }}>
+            <button className="btn" onClick={() => loadEstimates()} disabled={busy}>Refresh</button>
+            {!selected && <span style={{ fontSize: 12, color: "#6b7280" }}>Showing estimates across all projects</span>}
+          </div>
+          <table>
+            <thead><tr>{!selected && <th>Project</th>}<th>Name</th><th>Created</th><th>Materials</th><th>Labor Hrs</th><th>Total</th><th>Actions</th></tr></thead>
+            <tbody>
+              {estimates.map(e => (
+                <tr key={e.id}>
+                  {!selected && <td>{e.project_name}</td>}
+                  <td>{e.name}</td>
+                  <td>{new Date(e.created_at).toLocaleDateString()}</td>
+                  <td className="right">${Number(e.total_materials || 0).toFixed(2)}</td>
+                  <td className="right">{Number(e.total_labor_hours || 0).toFixed(2)}</td>
+                  <td className="right">${Number(e.total_cost || 0).toFixed(2)}</td>
+                  <td>
+                    <button className="btn sm" onClick={async () => {
+                      const pid = e.project_id;
+                      const p = projects.find(x => x.id === pid);
+                      if (p) selectProject(p);
+                      const r = await fetch(`${API}/projects/${pid}/export-pdf?estimate_id=${e.id}`, { headers: { Authorization: `Bearer ${token}` } });
+                      const b = await r.blob(); const url = URL.createObjectURL(b);
+                      window.open(url, "_blank");
+                    }}>Open</button>
+                    <button className="btn sm" style={{ marginLeft: 4 }} onClick={async () => {
+                      const r = await fetch(`${API}/projects/${e.project_id}/export-pdf?estimate_id=${e.id}`, { headers: { Authorization: `Bearer ${token}` } });
+                      const b = await r.blob(); const url = URL.createObjectURL(b);
+                      const a = document.createElement("a"); a.href = url; a.download = `${e.project_name}_estimate.pdf`; a.click();
+                    }}>PDF</button>
+                    <button className="btn sm danger" style={{ marginLeft: 4 }} onClick={async () => {
+                      if (!confirm("Delete estimate?")) return;
+                      await api(`/projects/${e.project_id}/estimates/${e.id}`, { method: "DELETE" });
+                      loadEstimates();
+                    }}>Delete</button>
+                  </td>
+                </tr>
+              ))}
+              {estimates.length === 0 && <tr><td colSpan={selected ? 6 : 7}>No estimates yet. Generate one from a project.</td></tr>}
+            </tbody>
+          </table>
         </div>
       )}
 
