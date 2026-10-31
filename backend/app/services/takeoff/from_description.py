@@ -41,7 +41,7 @@ def _nec_refs(description: str) -> list[str]:
             refs.append(text[s:e].replace("\n", " "))
     # keyword fallback
     if not refs:
-        for kw in ("receptacle", "lighting", "service", "grounding"):
+        for kw in ("receptacle", "lighting", "service", "grounding", "charger", "625"):
             if kw in description.lower():
                 idx = low.find(kw)
                 if idx != -1:
@@ -55,6 +55,109 @@ def _nec_refs(description: str) -> list[str]:
 def generate_from_description(project, description: str) -> tuple[list, list[str]]:
     items = []
     desc_low = description.lower()
+
+    # EV charger / EVSE handling (e.g. "EV charger 110 feet from panel")
+    ev_keywords = ["ev charger", "evse", "electric vehicle", "charger", "level 2", "tesla", "wall connector", "nema 14-50", "nema 6-50"]
+    if any(k in desc_low for k in ev_keywords):
+        dist = 0.0
+        m = re.search(r"(\d+(?:\.\d+)?)\s*(?:feet|ft|')", desc_low)
+        if m:
+            dist = float(m.group(1))
+        if dist <= 0:
+            m2 = re.search(r"from\s+(?:the\s+)?panel\s+(\d+(?:\.\d+)?)", desc_low)
+            if m2:
+                dist = float(m2.group(1))
+        if dist <= 0:
+            m3 = re.search(r"(\d+(?:\.\d+)?)\s*(?:feet|ft)\s+from", desc_low)
+            if m3:
+                dist = float(m3.group(1))
+
+        if "nema 14-50" in desc_low or "receptacle" in desc_low or "outlet" in desc_low or "plug" in desc_low:
+            items.append({
+                "description": "NEMA 14-50 Receptacle (EV)",
+                "category": "device",
+                "quantity": 1,
+                "unit": "ea",
+                "unit_cost": Decimal("45.00"),
+                "labor_hours": Decimal("0.5"),
+                "is_auto_generated": False,
+                "notes": "EV charging receptacle",
+            })
+        else:
+            items.append({
+                "description": "EV Charger (Level 2, hardwired)",
+                "category": "equipment",
+                "quantity": 1,
+                "unit": "ea",
+                "unit_cost": Decimal("650.00"),
+                "labor_hours": Decimal("2.0"),
+                "is_auto_generated": False,
+                "notes": "EVSE unit",
+            })
+
+        items.append({
+            "description": "50A 2-Pole Breaker (EV)",
+            "category": "breaker",
+            "quantity": 1,
+            "unit": "ea",
+            "unit_cost": Decimal("22.00"),
+            "labor_hours": Decimal("0.3"),
+            "is_auto_generated": False,
+            "notes": "EV branch circuit breaker",
+        })
+
+        if dist > 0:
+            items.append({
+                "description": "6 AWG THHN (EV circuit)",
+                "category": "wire",
+                "quantity": Decimal(str(round(dist * 3, 2))),
+                "unit": "ft",
+                "unit_cost": Decimal("0.75"),
+                "labor_hours": Decimal("0.03"),
+                "is_auto_generated": False,
+                "notes": "EV circuit conductors (%.0f ft run)" % dist,
+            })
+            items.append({
+                "description": "3/4 in EMT Conduit (EV run)",
+                "category": "conduit",
+                "quantity": Decimal(str(dist)),
+                "unit": "ft",
+                "unit_cost": Decimal("0.65"),
+                "labor_hours": Decimal("0.06"),
+                "is_auto_generated": False,
+                "notes": "EV conduit run (%.0f ft)" % dist,
+            })
+            items.append({
+                "description": "EMT Fittings & Straps (EV)",
+                "category": "conduit",
+                "quantity": 1,
+                "unit": "lot",
+                "unit_cost": Decimal("15.00"),
+                "labor_hours": Decimal("0.5"),
+                "is_auto_generated": False,
+                "notes": "EV conduit fittings",
+            })
+            items.append({
+                "description": "Wire Pull / Lubricant (EV)",
+                "category": "wire",
+                "quantity": 1,
+                "unit": "lot",
+                "unit_cost": Decimal("8.00"),
+                "labor_hours": Decimal("0.3"),
+                "is_auto_generated": False,
+                "notes": "EV wire pull",
+            })
+
+        items.append({
+            "description": "GFCI Protection (EV circuit)",
+            "category": "safety",
+            "quantity": 1,
+            "unit": "ea",
+            "unit_cost": Decimal("45.00"),
+            "labor_hours": Decimal("0.2"),
+            "is_auto_generated": False,
+            "notes": "NEC 625.54 GFCI protection for EVSE",
+        })
 
     # quantity extraction: "5 receptacles", "3 switches at $2"
     for kw, (d, cat, unit, cost, lh) in KEYWORD_ITEMS.items():
