@@ -45,6 +45,7 @@ export default function App() {
   const [chatInput, setChatInput] = useState("");
   const [chatHistory, setChatHistory] = useState<{ role: string; text: string }[]>([]);
   const [clients, setClients] = useState<any[]>([]);
+  const [estimates, setEstimates] = useState<any[]>([]);
   const [newClient, setNewClient] = useState({ name: "", email: "", phone: "", address: "" });
   const [workDesc, setWorkDesc] = useState("");
   const [workDescResult, setWorkDescResult] = useState<any>(null);
@@ -58,6 +59,8 @@ export default function App() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { if (token) { loadProjects(); loadClients(); } }, [token]);
   useEffect(() => { if (chatRef.current) chatRef.current.scrollTop = chatRef.current.scrollHeight; }, [chatHistory]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { if (token && selected && tab === "estimates") loadEstimates(); }, [tab, selected, token]);
 
   async function api(path: string, opts: any = {}) {
     const r = await fetch(`${API}${path}`, {
@@ -95,6 +98,12 @@ export default function App() {
   }
   async function loadClients() {
     try { setClients(await api("/clients")); }
+    catch (e: any) { setError(e.message); }
+  }
+  async function loadEstimates(pid?: string) {
+    if (!pid && !selected) return;
+    const id = pid || selected.id;
+    try { setEstimates(await api(`/projects/${id}/estimates`)); }
     catch (e: any) { setError(e.message); }
   }
   async function createClient() {
@@ -255,7 +264,7 @@ export default function App() {
       )}
       {busy && <div style={{ position: "fixed", top: 12, left: 12, background: "#2563eb", color: "#fff", padding: "6px 12px", borderRadius: 6, zIndex: 1000, fontSize: 12 }}>Working…</div>}
       <div className="tabs">
-        {["projects", "clients", "nec"].map(t => (
+        {["projects", "estimates", "clients", "nec"].map(t => (
           <div key={t} className={`tab ${tab === t ? "active" : ""}`} onClick={() => setTab(t)}>{t.toUpperCase()}</div>
         ))}
       </div>
@@ -520,6 +529,47 @@ export default function App() {
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {tab === "estimates" && (
+        <div className="card">
+          <h3>Saved Estimates {selected ? `— ${selected.name}` : ""}</h3>
+          {!selected && <p>Select a project first.</p>}
+          {selected && (
+            <>
+              <div className="row" style={{ marginBottom: 8 }}>
+                <button className="btn" onClick={() => loadEstimates()} disabled={busy}>Refresh</button>
+              </div>
+              <table>
+                <thead><tr><th>Name</th><th>Created</th><th>Materials</th><th>Labor Hrs</th><th>Total</th><th>Actions</th></tr></thead>
+                <tbody>
+                  {estimates.map(e => (
+                    <tr key={e.id}>
+                      <td>{e.name}</td>
+                      <td>{new Date(e.created_at).toLocaleDateString()}</td>
+                      <td className="right">${Number(e.total_materials || 0).toFixed(2)}</td>
+                      <td className="right">{Number(e.total_labor_hours || 0).toFixed(2)}</td>
+                      <td className="right">${Number(e.total_cost || 0).toFixed(2)}</td>
+                      <td>
+                        <button className="btn sm" onClick={async () => {
+                          const r = await fetch(`${API}/projects/${selected.id}/export-pdf?estimate_id=${e.id}`, { headers: { Authorization: `Bearer ${token}` } });
+                          const b = await r.blob(); const url = URL.createObjectURL(b);
+                          const a = document.createElement("a"); a.href = url; a.download = `${selected.name}_estimate.pdf`; a.click();
+                        }}>PDF</button>
+                        <button className="btn sm danger" style={{ marginLeft: 4 }} onClick={async () => {
+                          if (!confirm("Delete estimate?")) return;
+                          await api(`/projects/${selected.id}/estimates/${e.id}`, { method: "DELETE" });
+                          loadEstimates();
+                        }}>Delete</button>
+                      </td>
+                    </tr>
+                  ))}
+                  {estimates.length === 0 && <tr><td colSpan={6}>No estimates yet. Generate one from a project.</td></tr>}
+                </tbody>
+              </table>
+            </>
+          )}
         </div>
       )}
 
