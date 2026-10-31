@@ -35,7 +35,7 @@ def generate_pdf(project, estimate, load_calcs) -> str:
         story.append(Paragraph(f"Client: {client.name}" + (f" | {client.email}" if client.email else "") + (f" | {client.phone}" if client.phone else ""), body))
         if client.address:
             story.append(Paragraph(f"Address: {client.address}", body))
-    story.append(Paragraph(f"Type: {project.project_type} | Floor area: {project.floor_area_sqft} sqft | Units: {project.num_units}", body))
+    story.append(Paragraph(f"Type: {project.project_type} | Units: {project.num_units}", body))
     story.append(Paragraph(f"Generated: {estimate.created_at}", small))
     story.append(Spacer(1, 12))
 

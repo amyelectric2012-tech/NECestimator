@@ -115,7 +115,7 @@ def generate_from_description(project, description: str) -> tuple[list, list[str
                 "unit_cost": Decimal("0.75"),
                 "labor_hours": Decimal("0.03"),
                 "is_auto_generated": False,
-                "notes": "EV circuit conductors (%.0f ft run)" % dist,
+                "notes": f"EV circuit conductors ({dist:.0f} ft run)",
             })
             items.append({
                 "description": "3/4 in EMT Conduit (EV run)",
@@ -125,7 +125,7 @@ def generate_from_description(project, description: str) -> tuple[list, list[str
                 "unit_cost": Decimal("0.65"),
                 "labor_hours": Decimal("0.06"),
                 "is_auto_generated": False,
-                "notes": "EV conduit run (%.0f ft)" % dist,
+                "notes": f"EV conduit run ({dist:.0f} ft)",
             })
             items.append({
                 "description": "EMT Fittings & Straps (EV)",
