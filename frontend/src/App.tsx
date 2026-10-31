@@ -164,6 +164,10 @@ export default function App() {
       const lc = await api(`/projects/${p.id}/load-calc`);
       setCalc(lc);
     } catch {}
+    try {
+      const s = await api(`/projects/${p.id}/takeoff-items/`);
+      setTakeoff({ id: null, line_items: s.items, total_materials: s.total_material_cost, total_labor_hours: s.total_labor_hours, total_cost: s.grand_total, markup_pct: 0, contingency_pct: 5, tax_pct: 0, labor_summary: {}, scope_of_work: "", assumptions: "" });
+    } catch {}
   }
   async function runCalc() {
     if (!selected || busy) return;
