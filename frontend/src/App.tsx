@@ -301,7 +301,6 @@ export default function App() {
               <div>
                 <div className="row">
                   <input value={workEst.name} onChange={e => setWorkEst({ ...workEst, name: e.target.value })} placeholder="Project name" />
-                  <input value={workEst.area} onChange={e => setWorkEst({ ...workEst, area: e.target.value })} placeholder="sqft (optional)" style={{ width: 110 }} />
                 </div>
                 <textarea value={workEst.description} onChange={e => setWorkEst({ ...workEst, description: e.target.value })} placeholder="Describe the work, e.g. 'Install 100A service, 20 duplex receptacles, 8 switches' or 'EV charger 110 feet from panel'" style={{ width: "100%", marginTop: 8 }} rows={3} />
                 <div className="row" style={{ marginTop: 8 }}>
