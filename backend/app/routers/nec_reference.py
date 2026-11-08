@@ -1,11 +1,11 @@
 import os
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.auth.deps import get_current_user
 from app.database import SessionLocal, get_db
-from app.models import NECChunk
+from app.models import NECChunk, NECTable
 
 NEC_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "nec_2017.txt")
 if not os.path.exists(NEC_PATH):
@@ -55,6 +55,27 @@ def seed_nec_chunks(db: Session | None = None, chunk_size: int = 4000) -> int:
     finally:
         if own:
             db.close()
+
+
+def seed_nec_tables(db) -> int:
+    data = [
+        ("220.42", "Lighting Load Demand Factors (Dwelling units)",
+         [{"portion": "First 3000 VA", "factor": "100%"}, {"portion": "3001 to 120,000 VA", "factor": "35%"}, {"portion": "Remainder over 120,000 VA", "factor": "25%"}]),
+        ("220.54", "Demand Factors for Household Electric Clothes Dryers",
+         [{"dryers": "1-4", "factor": "100%"}, {"dryers": "5", "factor": "85%"}, {"dryers": "6", "factor": "75%"}, {"dryers": "7", "factor": "65%"}, {"dryers": "8", "factor": "60%"}, {"dryers": "9", "factor": "55%"}, {"dryers": "10", "factor": "50%"}, {"dryers": "11", "factor": "47%"}, {"dryers": "12-23", "factor": "47% - 1%/dryer over 11"}, {"dryers": "24-42", "factor": "35% - 0.5%/dryer over 23"}, {"dryers": "43+", "factor": "25%"}]),
+        ("220.55", "Demand Factors and Loads for Household Electric Ranges (Column C, not over 12 kW)",
+         [{"ranges": n, "max_demand_kw": v} for n, v in {1:8,2:11,3:14,4:17,5:20,6:21,7:22,8:23,9:24,10:25,11:26,12:27,13:28,14:29,15:30,16:31,17:32,18:33,19:34,20:35,21:36,22:37,23:38,24:39,25:40}.items()]),
+        ("220.84", "Optional Calculations — Demand Factors for Three or More Multifamily Dwelling Units",
+         [{"units": "3-5", "factor": "45%"}, {"units": "6-7", "factor": "44%"}, {"units": "8-10", "factor": "43%"}, {"units": "11-13", "factor": "42%"}, {"units": "14-16", "factor": "41%"}, {"units": "17-19", "factor": "40%"}, {"units": "20-22", "factor": "39%"}, {"units": "23-25", "factor": "38%"}, {"units": "26-28", "factor": "37%"}, {"units": "29-31", "factor": "36%"}, {"units": "32-34", "factor": "35%"}, {"units": "35-37", "factor": "34%"}, {"units": "38-40", "factor": "33%"}, {"units": "41-43", "factor": "32%"}, {"units": "44-46", "factor": "31%"}, {"units": "47-49", "factor": "30%"}, {"units": "50-52", "factor": "29%"}, {"units": "53-55", "factor": "28%"}, {"units": "56-58", "factor": "27%"}, {"units": "59-61", "factor": "26%"}, {"units": "62+", "factor": "23%"}]),
+    ]
+    inserted = 0
+    for name, desc, rows in data:
+        if db.query(NECTable).filter(NECTable.name == name).first():
+            continue
+        db.add(NECTable(name=name, description=desc, rows=rows))
+        inserted += 1
+    db.commit()
+    return inserted
 
 
 def load_text() -> str:
@@ -132,8 +153,31 @@ def seed_endpoint(user=Depends(get_current_user), db: Session = Depends(get_db))
     return {"inserted": n, "total_chunks": db.query(NECChunk).count()}
 
 
+
+def _table_from_db(name: str, db: Session):
+    row = db.query(NECTable).filter(NECTable.name == name).first()
+    if row:
+        return {"table": row.name, "description": row.description, "rows": row.rows}
+    return None
+
+
+@router.get("/tables")
+def list_tables(user=Depends(get_current_user), db: Session = Depends(get_db)):
+    rows = db.query(NECTable).order_by(NECTable.name).all()
+    return [{"table": r.name, "description": r.description} for r in rows]
+
+
+@router.get("/tables/{name}")
+def table_by_name(name: str, user=Depends(get_current_user), db: Session = Depends(get_db)):
+    r = _table_from_db(name, db)
+    if r: return r
+    raise HTTPException(status_code=404, detail="Table not found")
+
+
 @router.get("/tables/220.42")
-def table_220_42(user=Depends(get_current_user)):
+def table_220_42(user=Depends(get_current_user), db: Session = Depends(get_db)):
+    r = _table_from_db("220.42", db)
+    if r: return r
     return {"table": "220.42", "description": "Lighting Load Demand Factors (Dwelling units)",
             "rows": [
                 {"portion": "First 3000 VA", "factor": "100%"},
@@ -143,7 +187,9 @@ def table_220_42(user=Depends(get_current_user)):
 
 
 @router.get("/tables/220.54")
-def table_220_54(user=Depends(get_current_user)):
+def table_220_54(user=Depends(get_current_user), db: Session = Depends(get_db)):
+    r = _table_from_db("220.54", db)
+    if r: return r
     return {"table": "220.54", "description": "Demand Factors for Household Electric Clothes Dryers",
             "rows": [
                 {"dryers": "1-4", "factor": "100%"},
@@ -161,7 +207,9 @@ def table_220_54(user=Depends(get_current_user)):
 
 
 @router.get("/tables/220.55")
-def table_220_55(user=Depends(get_current_user)):
+def table_220_55(user=Depends(get_current_user), db: Session = Depends(get_db)):
+    r = _table_from_db("220.55", db)
+    if r: return r
     return {"table": "220.55", "description": "Demand Factors and Loads for Household Electric Ranges (Column C, not over 12 kW)",
             "rows": [{"ranges": n, "max_demand_kw": v} for n, v in {
                 1: 8, 2: 11, 3: 14, 4: 17, 5: 20, 6: 21, 7: 22, 8: 23, 9: 24, 10: 25,
@@ -171,7 +219,9 @@ def table_220_55(user=Depends(get_current_user)):
 
 
 @router.get("/tables/220.84")
-def table_220_84(user=Depends(get_current_user)):
+def table_220_84(user=Depends(get_current_user), db: Session = Depends(get_db)):
+    r = _table_from_db("220.84", db)
+    if r: return r
     from app.calculations.nec220 import _MULTIFAMILY_FACTORS
     rows = []
     for lo, hi, f in _MULTIFAMILY_FACTORS:

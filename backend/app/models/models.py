@@ -100,6 +100,15 @@ class Material(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
 
+class NECTable(Base):
+    __tablename__ = "nec_tables"
+    __table_args__ = (Index("ix_nec_tables_name", "name"),)
+    id = Column(UUID(as_uuid=False), primary_key=True, default=gen_uuid)
+    name = Column(String(50), nullable=False, unique=True)
+    description = Column(Text, nullable=True)
+    rows = Column(JSON, nullable=False)
+
+
 class NECChunk(Base):
     __tablename__ = "nec_chunks"
     __table_args__ = (Index("ix_nec_chunks_chunk_index", "chunk_index"),)
