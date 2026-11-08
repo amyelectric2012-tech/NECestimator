@@ -21,7 +21,7 @@ Docker: `docker-compose up --build` (API :8000). Dockerfile builds frontend then
 
 ## Environment
 
-- `DATABASE_URL` — Postgres. Local dev DB runs on **port 5433** (container `estimator-db`); default config uses 5432.
+- `DATABASE_URL` — Postgres. Local dev DB runs on **port 5433** as user `amram` (no password): `postgresql+psycopg2://amram@localhost:5433/estimator`. Default config (port 5432, postgres user) is for CI/Docker.
 - `SECRET_KEY` — JWT secret.
 - `PDF_DIR` — generated PDFs (default `/tmp/estimator_pdfs`).
 - `SMTP_HOST/PORT/USER/PASSWORD/FROM/TLS` — email delivery; endpoint fails if `SMTP_HOST` empty.
