@@ -18,6 +18,7 @@ from app.routers import (
     estimates,
     export,
     materials,
+    nec_calc,
     nec_reference,
     projects,
     takeoff,
@@ -68,6 +69,7 @@ app.include_router(projects.router)
 app.include_router(materials.router)
 app.include_router(estimates.router)
 app.include_router(export.router)
+app.include_router(nec_calc.router)
 app.include_router(nec_reference.router)
 app.include_router(calculations.router)
 app.include_router(takeoff.router)

@@ -5,6 +5,7 @@ from decimal import Decimal
 
 from app.services.load_calc.engine import LoadCalcEngine
 from app.services.load_calc.schemas import LoadCalcRequest
+from app.services.nec_calc import conduit_fill, voltage_drop
 from app.services.takeoff.generator import generate_takeoff_from_calculation
 
 # keyword -> (description, category, unit, unit_cost, labor_hours)
@@ -170,6 +171,31 @@ def generate_from_description(project, description: str) -> tuple[list, list[str
                 "notes": "EV wire pull",
             })
 
+        vd = voltage_drop("6", "cu", 50.0, dist if dist > 0 else 0.0, 1, 3.0) if dist > 0 else None
+        if vd and vd.get("warnings"):
+            items.append({
+                "description": "Voltage Drop Check (EV circuit)",
+                "category": "engineering",
+                "quantity": 1,
+                "unit": "ea",
+                "unit_cost": Decimal("0.00"),
+                "labor_hours": Decimal("0.0"),
+                "is_auto_generated": False,
+                "notes": "; ".join(vd["warnings"]) + f" (VD {vd.get('value_percent')}%)",
+            })
+        cf = conduit_fill("6", 3, "3/4", 40.0) if dist > 0 else None
+        if cf and cf.get("warnings"):
+            items.append({
+                "description": "Conduit Fill Check (EV circuit)",
+                "category": "engineering",
+                "quantity": 1,
+                "unit": "ea",
+                "unit_cost": Decimal("0.00"),
+                "labor_hours": Decimal("0.0"),
+                "is_auto_generated": False,
+                "notes": "; ".join(cf["warnings"]),
+            })
+
         items.append({
             "description": "GFCI Protection (EV circuit)",
             "category": "safety",
@@ -280,6 +306,31 @@ def generate_from_description(project, description: str) -> tuple[list, list[str
             "is_auto_generated": False,
             "notes": f"Service entrance conductors ({run_len} ft run x3)",
         })
+        vd_svc = voltage_drop(cond.split()[0] if False else "2/0", "cu", float(amps), float(run_len), 1, 3.0)
+        if vd_svc.get("warnings"):
+            items.append({
+                "description": "Voltage Drop Check (service)",
+                "category": "engineering",
+                "quantity": 1,
+                "unit": "ea",
+                "unit_cost": Decimal("0.00"),
+                "labor_hours": Decimal("0.0"),
+                "is_auto_generated": False,
+                "notes": "; ".join(vd_svc["warnings"]) + f" (VD {vd_svc.get('value_percent')}%)",
+            })
+        cf_svc = conduit_fill("2/0" if amps <= 200 else "4/0", 3, "2", 40.0)
+        if cf_svc.get("warnings"):
+            items.append({
+                "description": "Conduit Fill Check (service)",
+                "category": "engineering",
+                "quantity": 1,
+                "unit": "ea",
+                "unit_cost": Decimal("0.00"),
+                "labor_hours": Decimal("0.0"),
+                "is_auto_generated": False,
+                "notes": "; ".join(cf_svc["warnings"]),
+            })
+
         items.append({
             "description": gec,
             "category": "wire",
