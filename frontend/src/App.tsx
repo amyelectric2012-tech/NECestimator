@@ -17,14 +17,12 @@ table { width: 100%; border-collapse: collapse; font-size: 13px; }
 th, td { padding: 6px 8px; border-bottom: 1px solid #e5e7eb; text-align: left; }
 th { background: #f3f4f6; font-weight: 600; }
 .right { text-align: right; }
-.tabs { display: flex; gap: 4px; margin: 12px 0; }
-.tab { padding: 8px 16px; cursor: pointer; border-radius: 6px 6px 0 0; background: #e5e7eb; }
+.tabs { display: flex; gap: 4px; margin: 12px 0; flex-wrap: wrap; }
+.tab { padding: 8px 16px; cursor: pointer; border-radius: 6px 6px 0 0; background: #e5e7eb; border: none; font-size: 13px; font-family: inherit; }
 .tab.active { background: #fff; font-weight: 600; }
-h1,h2,h3 { margin: 8px 0; }
-.badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 11px; background: #e0e7ff; color: #3730a3; }
-mark { background: #fef08a; color: #1a1a2e; padding: 0 2px; border-radius: 2px; }
-
-@media (max-width: 640px) { table { font-size: 11px; } .row { flex-direction: column; align-items: stretch; } input { width: 100%; } }
+.tab:focus-visible { outline: 2px solid #2563eb; outline-offset: 2px; }
+.btn:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2px solid #2563eb; outline-offset: 1px; }
+@media (max-width: 640px) { table { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; } .row { flex-direction: column; align-items: stretch; } input { width: 100%; } }
 `;
 
 export default function App() {
@@ -344,7 +342,7 @@ export default function App() {
       {busy && <div style={{ position: "fixed", top: 12, left: 12, background: "#2563eb", color: "#fff", padding: "6px 12px", borderRadius: 6, zIndex: 1000, fontSize: 12 }}>Working…</div>}
       <div className="tabs">
         {["dashboard", "projects", "estimates", "clients", "crm", "nec"].map(t => (
-          <div key={t} className={`tab ${tab === t ? "active" : ""}`} onClick={() => setTab(t)}>{t.toUpperCase()}</div>
+          <button key={t} className={`tab ${tab === t ? "active" : ""}`} onClick={() => setTab(t)}>{t.toUpperCase()}</button>
         ))}
       </div>
 
@@ -353,7 +351,7 @@ export default function App() {
           <h3>CRM Dashboard</h3>
           {dashboard && (
             <>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8, marginBottom: 12 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 8, marginBottom: 12 }}>
                 {[
                   ["Clients", dashboard.kpis.clients],
                   ["Projects", dashboard.kpis.projects],
@@ -740,7 +738,7 @@ export default function App() {
             <button className="btn" onClick={loadPipeline} disabled={busy}>Refresh</button>
             <span style={{ fontSize: 12, color: "#6b7280" }}>{pipeline.length} estimates across all projects</span>
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 8, alignItems: "start" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 8, alignItems: "start" }}>
             {["draft","sent","viewed","accepted","rejected","lost"].map(status => (
               <div key={status} style={{ background: "#f9fafb", borderRadius: 6, padding: 8, minHeight: 120 }}>
                 <h4 style={{ margin: "0 0 8px", textTransform: "capitalize", fontSize: 13 }}>{status}</h4>
