@@ -111,9 +111,17 @@ class NECTable(Base):
 
 class NECChunk(Base):
     __tablename__ = "nec_chunks"
-    __table_args__ = (Index("ix_nec_chunks_chunk_index", "chunk_index"),)
+    __table_args__ = (
+        Index("ix_nec_chunks_chunk_index", "chunk_index"),
+        Index("ix_nec_chunks_article", "article"),
+        Index("ix_nec_chunks_section", "section"),
+    )
     id = Column(UUID(as_uuid=False), primary_key=True, default=gen_uuid)
     chunk_index = Column(Integer, nullable=False)
+    article = Column(String(20), nullable=True)
+    section = Column(String(20), nullable=True)
+    title = Column(String(300), nullable=True)
+    section_title = Column(String(300), nullable=True)
     content = Column(Text, nullable=False)
 
 

@@ -42,6 +42,9 @@ export default function App() {
   const [necResults, setNecResults] = useState<any>(null);
   const [necContent, setNecContent] = useState<any>(null);
   const [necOffset, setNecOffset] = useState(0);
+  const [necStatus, setNecStatus] = useState<any>(null);
+  const [necArticles, setNecArticles] = useState<any[]>([]);
+  const [necArticleFilter, setNecArticleFilter] = useState("");
   const [chatInput, setChatInput] = useState("");
   const [chatHistory, setChatHistory] = useState<{ role: string; text: string }[]>([]);
   const [clients, setClients] = useState<any[]>([]);
@@ -61,6 +64,8 @@ export default function App() {
   useEffect(() => { if (chatRef.current) chatRef.current.scrollTop = chatRef.current.scrollHeight; }, [chatHistory]);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { if (token && tab === "estimates") loadEstimates(); }, [tab, selected, token, projects]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { if (token && tab === "nec" && !necStatus) loadNecMeta(); }, [tab, token]);
 
   async function api(path: string, opts: any = {}) {
     const r = await fetch(`${API}${path}`, {
@@ -226,8 +231,26 @@ export default function App() {
     const a = document.createElement("a"); a.href = url; a.download = `${selected.name}.pdf`; a.click();
   }
   async function searchNec() {
-    try { setNecResults(await api(`/nec/search?q=${encodeURIComponent(necQuery)}&limit=8`)); }
+    try {
+      const filter = necArticleFilter ? `&article=${encodeURIComponent(necArticleFilter)}` : "";
+      setNecResults(await api(`/nec/search?q=${encodeURIComponent(necQuery)}&limit=20${filter}`));
+    }
     catch (e: any) { setError(e.message); }
+  }
+  async function loadNecMeta() {
+    try {
+      const [status, articles] = await Promise.all([api("/nec/status"), api("/nec/articles")]);
+      setNecStatus(status);
+      setNecArticles(articles);
+    } catch (e: any) { setError(e.message); }
+  }
+  async function loadNecArticle(article: string) {
+    if (!article) return;
+    try {
+      const d = await api(`/nec/articles/${encodeURIComponent(article)}`);
+      setNecContent({ offset: 0, limit: d.text.length, total: d.text.length, text: d.text });
+      setNecOffset(0);
+    } catch (e: any) { setError(e.message); }
   }
   async function loadTable(t: string) {
     try { setNecResults(await api(`/nec/tables/${t}`)); }
@@ -601,38 +624,61 @@ export default function App() {
       {tab === "nec" && (
         <div className="card">
           <h3>NEC 2017 Reference Search</h3>
+          {necStatus && (
+            <p style={{ fontSize: 12, color: "#374151", marginTop: 0 }}>
+              Full code book loaded: <strong>{necStatus.articles}</strong> articles · <strong>{necStatus.sections}</strong> sections ·{" "}
+              <strong>{necStatus.chunks}</strong> chunks · <strong>{(necStatus.coverage * 100).toFixed(1)}%</strong> of {necStatus.source_chars.toLocaleString()} source chars
+            </p>
+          )}
           <div className="row">
-            <input value={necQuery} onChange={e => setNecQuery(e.target.value)} placeholder="Search NEC text..." style={{ flex: 1 }} onKeyDown={e => e.key === "Enter" && searchNec()} />
+            <input value={necQuery} onChange={e => setNecQuery(e.target.value)} placeholder="Search NEC text (e.g. 220.42, EV charging, grounding electrode)..." style={{ flex: 1 }} onKeyDown={e => e.key === "Enter" && searchNec()} />
+            <select value={necArticleFilter} onChange={e => setNecArticleFilter(e.target.value)} style={{ maxWidth: 260 }}>
+              <option value="">All articles</option>
+              {necArticles.map(a => (
+                <option key={a.article} value={a.article}>Art. {a.article} — {a.title || ""}</option>
+              ))}
+            </select>
             <button className="btn" onClick={searchNec}>Search</button>
+            {necArticleFilter && <button className="btn secondary" onClick={() => loadNecArticle(necArticleFilter)}>Read Article</button>}
           </div>
           <div className="row" style={{ marginTop: 8 }}>
             <button className="btn secondary sm" onClick={() => loadTable("220.42")}>Table 220.42</button>
             <button className="btn secondary sm" onClick={() => loadTable("220.54")}>Table 220.54</button>
             <button className="btn secondary sm" onClick={() => loadTable("220.55")}>Table 220.55</button>
             <button className="btn secondary sm" onClick={() => loadTable("220.84")}>Table 220.84</button>
-          </div>
-          <div style={{ marginTop: 12 }}>
             <button className="btn secondary sm" onClick={() => loadNecContent(0)}>Load Full NEC 2017 Text</button>
-            {necContent && (
-              <div style={{ marginTop: 8 }}>
-                <p style={{ fontSize: 12, color: "#6b7280" }}>Showing {necContent.offset}–{Math.min(necContent.offset + necContent.limit, necContent.total)} of {necContent.total} chars</p>
-                <pre style={{ background: "#f4f4f4", padding: 12, maxHeight: 400, overflow: "auto", fontSize: 12, whiteSpace: "pre-wrap" }}>{necContent.text}</pre>
-                <div className="row" style={{ marginTop: 8 }}>
-                  <button className="btn secondary sm" disabled={necOffset <= 0} onClick={() => loadNecContent(Math.max(0, necOffset - 8000))}>Prev</button>
-                  <button className="btn secondary sm" disabled={necOffset + 8000 >= necContent.total} onClick={() => loadNecContent(necOffset + 8000)}>Next</button>
-                </div>
-              </div>
-            )}
           </div>
+          {necContent && (
+            <div style={{ marginTop: 8 }}>
+              <p style={{ fontSize: 12, color: "#6b7280" }}>Showing {necContent.offset}–{Math.min(necContent.offset + necContent.limit, necContent.total)} of {necContent.total} chars</p>
+              <pre style={{ background: "#f4f4f4", padding: 12, maxHeight: 460, overflow: "auto", fontSize: 12, whiteSpace: "pre-wrap" }}>{necContent.text}</pre>
+              <div className="row" style={{ marginTop: 8 }}>
+                <button className="btn secondary sm" disabled={necOffset <= 0} onClick={() => loadNecContent(Math.max(0, necOffset - 8000))}>Prev</button>
+                <button className="btn secondary sm" disabled={necOffset + 8000 >= necContent.total} onClick={() => loadNecContent(necOffset + 8000)}>Next</button>
+              </div>
+            </div>
+          )}
 
           {necResults && (
             <div style={{ marginTop: 12 }}>
               {necResults.results ? (
-                necResults.results.map((r: any, i: number) => (
-                  <div key={i} style={{ padding: 8, borderBottom: "1px solid #e5e7eb", fontSize: 13 }}>
-                    <div dangerouslySetInnerHTML={{ __html: r.snippet || "" }} />
-                  </div>
-                ))
+                <>
+                  <p style={{ fontSize: 12, color: "#6b7280" }}>
+                    {necResults.count} match{necResults.count === 1 ? "" : "es"}{necResults.article ? ` in Article ${necResults.article}` : ""}
+                  </p>
+                  {necResults.results.map((r: any, i: number) => (
+                    <div key={i} style={{ padding: 8, borderBottom: "1px solid #e5e7eb", fontSize: 13 }}>
+                      {(r.article || r.section) && (
+                        <div style={{ fontSize: 11, color: "#6b7280", marginBottom: 2 }}>
+                          {r.article && <strong>Art. {r.article}</strong>} {r.title}
+                          {r.section && <> · § {r.section} {r.section_title}</>}
+                        </div>
+                      )}
+                      <div dangerouslySetInnerHTML={{ __html: r.snippet || "" }} />
+                    </div>
+                  ))}
+                  {necResults.results.length === 0 && <p>No matches.</p>}
+                </>
               ) : (
                 <pre style={{ background: "#f4f4f4", padding: 12 }}>{JSON.stringify(necResults, null, 2)}</pre>
               )}

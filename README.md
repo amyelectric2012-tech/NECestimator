@@ -46,7 +46,7 @@ cd backend && pytest -q
 - Materials: `/materials` CRUD
 - Estimates/takeoff: `POST /projects/{id}/estimates`, `POST /projects/{id}/takeoff`
 - PDF: `GET /projects/{id}/export-pdf`
-- NEC reference: `GET /nec/search?q=`, `GET /nec/tables/{220.42,220.54,220.55,220.84}`
+- NEC reference: `GET /nec/search?q=&article=`, `GET /nec/status`, `GET /nec/articles[/{article}]`, `GET /nec/sections/{section}`, `GET /nec/tables/{220.42,220.54,220.55,220.84}`
 
 ## Notes
 - All calculations are preliminary and must be verified in the field.

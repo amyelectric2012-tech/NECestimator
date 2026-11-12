@@ -39,7 +39,8 @@ Docker: `docker-compose up --build` (API :8000). Dockerfile builds frontend then
 - List endpoints return `X-Total-Count` header (pagination via `limit`/`offset`).
 - Security headers middleware + `robots.txt` (authenticated app). CORS allows all origins.
 - All PDFs state "Preliminary — Not for Construction".
-- NEC full text: `backend/data/nec_2017.txt`; ingested into `nec_chunks` table via `seed_nec.py` (auto-seeded on startup). `/nec/seed` triggers re-ingest.
+- NEC full text: `backend/data/nec_2017.txt` (complete NEC 2017 — 156 articles, Chapter 9 tables, informative annexes, and index; ~4.3 MB). Ingested into `nec_chunks` as article/section-aware chunks by `app/services/nec_ingest.py`; `seed_nec.py [--force]` re-ingests, `/nec/seed?force=true` does the same over HTTP. Startup auto-seeds/re-ingests when the table is empty or lacks article metadata (`NEC_SKIP_SEED=1` disables this, used by tests).
+- NEC coverage: `GET /nec/status` reports chunks/articles/sections and a whitespace-insensitive coverage ratio (currently 100%). Browse with `GET /nec/articles`, `/nec/articles/{article}`, `/nec/sections/{section}`; search supports `?q=&article=&limit=&offset=` and returns article/section metadata with HTML-escaped snippets.
 
 ## Gotchas
 

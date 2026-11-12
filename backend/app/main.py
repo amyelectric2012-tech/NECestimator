@@ -32,10 +32,11 @@ async def lifespan(app: FastAPI):
     try:
         from app.database import SessionLocal as _SL
         from app.routers.nec_reference import seed_nec_chunks, seed_nec_tables
-        _db = _SL()
-        seed_nec_chunks(_db)
-        seed_nec_tables(_db)
-        _db.close()
+        if os.environ.get("NEC_SKIP_SEED") != "1":
+            _db = _SL()
+            seed_nec_chunks(_db)
+            seed_nec_tables(_db)
+            _db.close()
     except Exception as e:
         print("NEC seed skipped:", e)
     yield

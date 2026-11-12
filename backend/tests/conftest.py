@@ -2,6 +2,7 @@ import os
 
 os.environ.setdefault("DATABASE_URL", "sqlite:///./test.db")
 os.environ.setdefault("SECRET_KEY", "test-secret")
+os.environ.setdefault("NEC_SKIP_SEED", "1")
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
