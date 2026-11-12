@@ -49,6 +49,7 @@ export default function App() {
   const [chatHistory, setChatHistory] = useState<{ role: string; text: string }[]>([]);
   const [clients, setClients] = useState<any[]>([]);
   const [estimates, setEstimates] = useState<any[]>([]);
+  const [dashboard, setDashboard] = useState<any>(null);
   const [pipeline, setPipeline] = useState<any[]>([]);
   const [crmEstimate, setCrmEstimate] = useState<any>(null);
   const [crmActivities, setCrmActivities] = useState<any[]>([]);
@@ -71,7 +72,7 @@ export default function App() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { if (token && tab === "nec" && !necStatus) loadNecMeta(); }, [tab, token]);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { if (token && tab === "crm") loadPipeline(); }, [tab, token]);
+  useEffect(() => { if (token && tab === "dashboard") loadDashboard(); }, [tab, token]);
 
   async function api(path: string, opts: any = {}) {
     const r = await fetch(`${API}${path}`, {
@@ -269,6 +270,10 @@ export default function App() {
       setNecOffset(off);
     } catch (e: any) { setError(e.message); }
   }
+  async function loadDashboard() {
+    try { setDashboard(await api("/crm/dashboard")); }
+    catch (e: any) { setError(e.message); }
+  }
   async function loadPipeline() {
     try { setPipeline(await api("/crm/pipeline")); }
     catch (e: any) { setError(e.message); }
@@ -338,10 +343,87 @@ export default function App() {
       )}
       {busy && <div style={{ position: "fixed", top: 12, left: 12, background: "#2563eb", color: "#fff", padding: "6px 12px", borderRadius: 6, zIndex: 1000, fontSize: 12 }}>Working…</div>}
       <div className="tabs">
-        {["projects", "estimates", "clients", "crm", "nec"].map(t => (
+        {["dashboard", "projects", "estimates", "clients", "crm", "nec"].map(t => (
           <div key={t} className={`tab ${tab === t ? "active" : ""}`} onClick={() => setTab(t)}>{t.toUpperCase()}</div>
         ))}
       </div>
+
+      {tab === "dashboard" && (
+        <div className="card">
+          <h3>CRM Dashboard</h3>
+          {dashboard && (
+            <>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8, marginBottom: 12 }}>
+                {[
+                  ["Clients", dashboard.kpis.clients],
+                  ["Projects", dashboard.kpis.projects],
+                  ["Estimates", dashboard.kpis.estimates],
+                  ["Open Estimates", dashboard.kpis.open_estimates],
+                  ["Accepted", dashboard.kpis.accepted_estimates],
+                  ["Pipeline Value", "$" + Number(dashboard.kpis.pipeline_value).toFixed(2)],
+                  ["Accepted Value", "$" + Number(dashboard.kpis.accepted_value).toFixed(2)],
+                ].map(([label, val]) => (
+                  <div key={String(label)} style={{ background: "#f9fafb", borderRadius: 6, padding: 10 }}>
+                    <div style={{ fontSize: 11, color: "#6b7280" }}>{label}</div>
+                    <div style={{ fontSize: 18, fontWeight: 700 }}>{val as any}</div>
+                  </div>
+                ))}
+              </div>
+
+              <h4>Estimates by Status</h4>
+              <div className="row" style={{ marginBottom: 12, flexWrap: "wrap", gap: 6 }}>
+                {Object.entries(dashboard.by_status || {}).map(([st, n]) => (
+                  <span key={st} style={{ background: "#e5e7eb", borderRadius: 4, padding: "2px 8px", fontSize: 12 }}>{st}: {n as any}</span>
+                ))}
+              </div>
+
+              <h4>Recent Estimates</h4>
+              <table style={{ marginBottom: 12 }}>
+                <thead><tr><th>Name</th><th>Client</th><th>Project</th><th>Status</th><th>Total</th><th>Updated</th></tr></thead>
+                <tbody>
+                  {dashboard.recent_estimates.map((e: any) => (
+                    <tr key={e.id}>
+                      <td>{e.name}</td>
+                      <td>{e.client_name || "—"}</td>
+                      <td>{e.project_name}</td>
+                      <td>{e.status}</td>
+                      <td className="right">${Number(e.total_cost || 0).toFixed(2)}</td>
+                      <td>{new Date(e.updated_at).toLocaleDateString()}</td>
+                    </tr>
+                  ))}
+                  {dashboard.recent_estimates.length === 0 && <tr><td colSpan={6}>No estimates yet.</td></tr>}
+                </tbody>
+              </table>
+
+              <h4>Clients</h4>
+              <table style={{ marginBottom: 12 }}>
+                <thead><tr><th>Name</th><th>Email</th><th>Phone</th><th>Estimates</th><th>Value</th></tr></thead>
+                <tbody>
+                  {dashboard.clients.map((c: any) => (
+                    <tr key={c.id}>
+                      <td>{c.name}</td>
+                      <td>{c.email || "—"}</td>
+                      <td>{c.phone || "—"}</td>
+                      <td className="right">{c.estimates}</td>
+                      <td className="right">${Number(c.value || 0).toFixed(2)}</td>
+                    </tr>
+                  ))}
+                  {dashboard.clients.length === 0 && <tr><td colSpan={5}>No clients yet.</td></tr>}
+                </tbody>
+              </table>
+
+              <h4>Recent Activity</h4>
+              {dashboard.recent_activities.length === 0 && <p style={{ color: "#6b7280", fontSize: 12 }}>No activity yet.</p>}
+              {dashboard.recent_activities.map((a: any) => (
+                <div key={a.id} style={{ padding: 6, borderBottom: "1px solid #f3f4f6", fontSize: 12 }}>
+                  <div style={{ color: "#6b7280" }}>{new Date(a.created_at).toLocaleString()} · {a.estimate_name} ({a.project_name}) · {a.activity_type}</div>
+                  <div>{a.body}</div>
+                </div>
+              ))}
+            </>
+          )}
+        </div>
+      )}
 
       {tab === "projects" && (
         <>
