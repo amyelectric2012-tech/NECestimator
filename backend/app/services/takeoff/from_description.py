@@ -30,26 +30,48 @@ def _nec_refs(description: str) -> list[str]:
     if not text:
         return []
     low = text.lower()
-    refs = []
-    # search for article/section numbers mentioned in description (e.g. 210.8, 220.12)
+    refs: list[str] = []
+    seen: set[int] = set()
+
+    def add(needle: str) -> None:
+        if not needle:
+            return
+        idx = low.find(needle.lower())
+        while idx != -1 and len(refs) < 8:
+            if all(abs(idx - p) > 60 for p in seen):
+                seen.add(idx)
+                s = max(0, idx - 80)
+                e = min(len(text), idx + len(needle) + 160)
+                refs.append(text[s:e].replace("\n", " "))
+            idx = low.find(needle.lower(), idx + max(1, len(needle)))
+
+    # article/section numbers mentioned explicitly in the description
     for m in re.finditer(r"\b(\d{3}\.\d+(?:\([A-Za-z]\))?)\b", description):
-        art = m.group(1)
-        idx = low.find(art.lower())
-        if idx != -1:
-            s = max(0, idx - 80)
-            e = min(len(text), idx + len(art) + 120)
-            refs.append(text[s:e].replace("\n", " "))
-    # keyword fallback
+        add(m.group(1))
+
+    dl = description.lower()
+    service_job = any(k in dl for k in ("service", "panel", "meter", "mast", "overhead", "underground", "upgrade", "disconnect", "weatherhead"))
+
+    if service_job:
+        # Pull the governing NEC sections for a service upgrade out of the code book.
+        for sec in ("230.24", "230.70", "230.79", "230.42", "250.50", "250.52", "250.53", "250.66", "310.15", "240.4", "220.83"):
+            add(sec)
+        for kw in ("service", "overhead", "clearance", "grounding electrode", "mast", "weatherhead", "disconnect", "conductor"):
+            add(kw)
+    else:
+        for kw in ("receptacle", "lighting", "service", "grounding", "charger", "625"):
+            if kw in dl:
+                add(kw)
+                break
+
+    # keyword fallback when nothing matched
     if not refs:
         for kw in ("receptacle", "lighting", "service", "grounding", "charger", "625"):
-            if kw in description.lower():
-                idx = low.find(kw)
-                if idx != -1:
-                    s = max(0, idx - 80)
-                    e = min(len(text), idx + len(kw) + 120)
-                    refs.append(text[s:e].replace("\n", " "))
-                    break
-    return refs[:5]
+            if kw in dl:
+                add(kw)
+                break
+
+    return refs[:8]
 
 
 def generate_from_description(project, description: str) -> tuple[list, list[str]]:
@@ -157,6 +179,176 @@ def generate_from_description(project, description: str) -> tuple[list, list[str
             "labor_hours": Decimal("0.2"),
             "is_auto_generated": False,
             "notes": "NEC 625.54 GFCI protection for EVSE",
+        })
+
+    # Service / panel upgrade handling (e.g. "upgrade panel 200A service overhead")
+    service_keywords = ["panel", "service", "meter", "mast", "weatherhead", "overhead", "underground", "upgrade", "disconnect", "main breaker", "service entrance"]
+    ev_job = any(k in desc_low for k in ev_keywords)
+    service_job = (not ev_job) and any(k in desc_low for k in service_keywords) and ("panel" in desc_low or "service" in desc_low or "meter" in desc_low or "mast" in desc_low or "upgrade" in desc_low)
+    if service_job:
+        amps = 200
+        m = re.search(r"(\d+)\s*a(?:mp)?(?:s)?\b", desc_low)
+        if m:
+            try:
+                amps = int(m.group(1))
+            except ValueError:
+                amps = 200
+        overhead = any(k in desc_low for k in ("overhead", "mast", "weatherhead", "pole", "aerial"))
+
+        if amps <= 100:
+            cond = "4 AWG Cu THWN (service entrance)"
+            gec = "6 AWG Cu (GEC)"
+        elif amps <= 200:
+            cond = "2/0 Cu THWN (service entrance)"
+            gec = "4 AWG Cu (GEC)"
+        else:
+            cond = "400 kcmil Cu (service entrance)"
+            gec = "2 AWG Cu (GEC)"
+
+        mast_len = 10 if overhead else 0
+        run_len = 60 if overhead else 40
+
+        items.append({
+            "description": f"{amps}A Main Breaker Panel (load center)",
+            "category": "panel",
+            "quantity": 1,
+            "unit": "ea",
+            "unit_cost": Decimal("320.00" if amps <= 200 else "680.00"),
+            "labor_hours": Decimal("4.0"),
+            "is_auto_generated": False,
+            "notes": f"NEC 230.79 / 408 - {amps}A service panel",
+        })
+        items.append({
+            "description": f"{amps}A Meter Base (socket)",
+            "category": "meter",
+            "quantity": 1,
+            "unit": "ea",
+            "unit_cost": Decimal("185.00"),
+            "labor_hours": Decimal("2.0"),
+            "is_auto_generated": False,
+            "notes": "Utility meter socket",
+        })
+        if overhead:
+            items.append({
+                "description": "Service Mast (2 in RMC/IMC)",
+                "category": "conduit",
+                "quantity": Decimal(str(mast_len)),
+                "unit": "ft",
+                "unit_cost": Decimal("12.50"),
+                "labor_hours": Decimal("0.25"),
+                "is_auto_generated": False,
+                "notes": "NEC 230.24 clearance / mast height",
+            })
+            items.append({
+                "description": "Weatherhead (service head)",
+                "category": "fitting",
+                "quantity": 1,
+                "unit": "ea",
+                "unit_cost": Decimal("28.00"),
+                "labor_hours": Decimal("0.5"),
+                "is_auto_generated": False,
+                "notes": "Overhead service head",
+            })
+            items.append({
+                "description": "Insulator / Drip Loop Hardware",
+                "category": "fitting",
+                "quantity": 1,
+                "unit": "lot",
+                "unit_cost": Decimal("25.00"),
+                "labor_hours": Decimal("0.5"),
+                "is_auto_generated": False,
+                "notes": "Overhead service attachments",
+            })
+        else:
+            items.append({
+                "description": "2 in PVC Conduit (underground service)",
+                "category": "conduit",
+                "quantity": Decimal(str(run_len)),
+                "unit": "ft",
+                "unit_cost": Decimal("4.20"),
+                "labor_hours": Decimal("0.15"),
+                "is_auto_generated": False,
+                "notes": "Underground service raceway",
+            })
+        items.append({
+            "description": cond,
+            "category": "wire",
+            "quantity": Decimal(str(run_len * 3)),
+            "unit": "ft",
+            "unit_cost": Decimal("3.85"),
+            "labor_hours": Decimal("0.05"),
+            "is_auto_generated": False,
+            "notes": f"Service entrance conductors ({run_len} ft run x3)",
+        })
+        items.append({
+            "description": gec,
+            "category": "wire",
+            "quantity": Decimal(str(25)),
+            "unit": "ft",
+            "unit_cost": Decimal("1.60"),
+            "labor_hours": Decimal("0.04"),
+            "is_auto_generated": False,
+            "notes": "NEC 250.66 GEC sizing",
+        })
+        items.append({
+            "description": "Ground Rod 8 ft x 5/8 in (copper-clad)",
+            "category": "grounding",
+            "quantity": 2,
+            "unit": "ea",
+            "unit_cost": Decimal("18.00"),
+            "labor_hours": Decimal("0.75"),
+            "is_auto_generated": False,
+            "notes": "NEC 250.52 / 250.53",
+        })
+        items.append({
+            "description": "Ground Rod Clamp & Acorn Nut",
+            "category": "grounding",
+            "quantity": 2,
+            "unit": "ea",
+            "unit_cost": Decimal("6.50"),
+            "labor_hours": Decimal("0.15"),
+            "is_auto_generated": False,
+            "notes": "Grounding electrode connection",
+        })
+        items.append({
+            "description": "Main Bonding Jumper",
+            "category": "grounding",
+            "quantity": 1,
+            "unit": "ea",
+            "unit_cost": Decimal("12.00"),
+            "labor_hours": Decimal("0.25"),
+            "is_auto_generated": False,
+            "notes": "NEC 250.28",
+        })
+        items.append({
+            "description": "Neutral/Ground Bar Kit",
+            "category": "panel",
+            "quantity": 1,
+            "unit": "ea",
+            "unit_cost": Decimal("18.00"),
+            "labor_hours": Decimal("0.25"),
+            "is_auto_generated": False,
+            "notes": "Panel accessory",
+        })
+        items.append({
+            "description": "20A Single-Pole Breaker",
+            "category": "breaker",
+            "quantity": 10,
+            "unit": "ea",
+            "unit_cost": Decimal("8.50"),
+            "labor_hours": Decimal("0.125"),
+            "is_auto_generated": False,
+            "notes": "Branch circuit breakers",
+        })
+        items.append({
+            "description": "Permit / Inspection (service upgrade)",
+            "category": "labor",
+            "quantity": 1,
+            "unit": "lot",
+            "unit_cost": Decimal("250.00"),
+            "labor_hours": Decimal("2.0"),
+            "is_auto_generated": False,
+            "notes": "AHJ permit & inspection",
         })
 
     # quantity extraction: "5 receptacles", "3 switches at $2"
