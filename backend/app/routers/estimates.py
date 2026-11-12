@@ -32,6 +32,8 @@ def create_estimate(project_id: str, payload: EstimateCreate, db: Session = Depe
     if not proj:
         raise HTTPException(status_code=404, detail="Project not found")
     est = Estimate(project_id=proj.id, client_id=proj.client_id, **payload.model_dump())
+    if est.status is None:
+        est.status = "draft"
     _calc_totals(est, {})
     db.add(est)
     db.commit()

@@ -144,7 +144,7 @@ class EstimateCreate(BaseModel):
     assumptions: str | None = None
     line_items: list[dict[str, Any]] = []
     labor_summary: dict[str, Any] = {}
-    status: str | None = None
+    status: str | None = "draft"
     probability: float | None = None
     follow_up_date: datetime | None = None
     next_action: str | None = None
