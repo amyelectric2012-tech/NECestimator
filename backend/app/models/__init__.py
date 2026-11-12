@@ -1,4 +1,5 @@
 from app.models.models import (
+    CalculationRecord,
     Client,
     Estimate,
     EstimateActivity,
@@ -12,4 +13,4 @@ from app.models.models import (
 )
 from app.models.takeoff import TakeoffItem
 
-__all__ = ["Client", "Estimate", "EstimateActivity", "LaborRate", "LoadCalculation", "Material", "NECChunk", "NECTable", "Project", "TakeoffItem", "User"]
+__all__ = ["CalculationRecord", "Client", "Estimate", "EstimateActivity", "LaborRate", "LoadCalculation", "Material", "NECChunk", "NECTable", "Project", "TakeoffItem", "User"]

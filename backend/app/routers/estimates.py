@@ -20,10 +20,42 @@ def _calc_totals(est: Estimate, materials_by_id: dict):
         li["line_labor"] = round(qty * lh, 2)
         total_mat += qty * uc
         total_hours += qty * lh
-    mat_with_markup = total_mat * (1 + (est.markup_pct or 0)) * (1 + (est.tax_pct or 0))
     est.total_materials = round(total_mat, 2)
     est.total_labor_hours = round(total_hours, 2)
-    est.total_cost = round(mat_with_markup, 2)
+
+    # labor rate
+    labor_rate = getattr(est, "labor_rate", None)
+    if labor_rate is None:
+        labor_rate = 85.0
+    try:
+        labor_rate = float(labor_rate)
+    except (TypeError, ValueError):
+        labor_rate = 85.0
+    labor_cost = total_hours * labor_rate
+
+    direct_cost = total_mat + labor_cost
+    overhead_pct = est.overhead_pct if est.overhead_pct is not None else 0.10
+    contingency_pct = est.contingency_pct if est.contingency_pct is not None else 0.05
+    markup_pct = est.markup_pct if est.markup_pct is not None else 0.10
+    tax_pct = est.tax_pct if est.tax_pct is not None else 0.0
+
+    overhead_cost = direct_cost * overhead_pct
+    contingency_cost = (direct_cost + overhead_cost) * contingency_pct
+    subtotal = direct_cost + overhead_cost + contingency_cost
+    markup_cost = subtotal * markup_pct
+    tax_cost = total_mat * tax_pct
+    grand_total = subtotal + markup_cost + tax_cost
+    profit = markup_cost
+    gross_margin = (profit / grand_total) if grand_total else 0.0
+
+    est.direct_cost = round(direct_cost, 2)
+    est.overhead_cost = round(overhead_cost, 2)
+    est.contingency_cost = round(contingency_cost, 2)
+    est.markup_cost = round(markup_cost, 2)
+    est.tax_cost = round(tax_cost, 2)
+    est.total_cost = round(grand_total, 2)
+    est.profit = round(profit, 2)
+    est.gross_margin = round(gross_margin, 4)
 
 
 @router.post("/{project_id}/estimates", response_model=EstimateOut)

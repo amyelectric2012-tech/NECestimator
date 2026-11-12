@@ -76,6 +76,8 @@ class Project(Base):
     existing_service_amps = Column(Float, nullable=True)
     labor_rate = Column(Numeric(10, 2), default=85.00)
     contingency_percent = Column(Float, default=5.0)
+    jurisdiction = Column(String(100), nullable=True)
+    nec_edition = Column(String(20), default="2017", server_default="2017", nullable=False)
     client_id = Column(UUID(as_uuid=False), ForeignKey("clients.id"), nullable=True)
     owner_id = Column(UUID(as_uuid=False), ForeignKey("users.id"), nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -153,6 +155,15 @@ class Estimate(Base):
     markup_pct = Column(Float, default=0.10)
     contingency_pct = Column(Float, default=0.05)
     tax_pct = Column(Float, default=0.0)
+    overhead_pct = Column(Float, default=0.10)
+    # computed pricing (audit trail)
+    direct_cost = Column(Float, default=0.0)
+    overhead_cost = Column(Float, default=0.0)
+    contingency_cost = Column(Float, default=0.0)
+    markup_cost = Column(Float, default=0.0)
+    tax_cost = Column(Float, default=0.0)
+    profit = Column(Float, default=0.0)
+    gross_margin = Column(Float, default=0.0)
     scope_of_work = Column(Text, nullable=True)
     assumptions = Column(Text, nullable=True)
     line_items = Column(JSON, default=list)
@@ -173,6 +184,20 @@ class Estimate(Base):
     project = relationship("Project", back_populates="estimates")
     client = relationship("Client")
     activities = relationship("EstimateActivity", back_populates="estimate", cascade="all, delete-orphan", order_by="EstimateActivity.created_at.desc()")
+
+
+class CalculationRecord(Base):
+    __tablename__ = "calculation_records"
+    __table_args__ = (Index("ix_calculation_records_project_id", "project_id"),)
+    id = Column(UUID(as_uuid=False), primary_key=True, default=gen_uuid)
+    project_id = Column(UUID(as_uuid=False), ForeignKey("projects.id"), nullable=False)
+    method = Column(String(50), nullable=False)
+    code_edition = Column(String(20), default="2017")
+    engine_version = Column(String(30), default="nec220-1.0")
+    inputs = Column(JSON, default=dict)
+    outputs = Column(JSON, default=dict)
+    warnings = Column(JSON, default=list)
+    created_at = Column(DateTime, default=datetime.utcnow)
 
 
 class EstimateActivity(Base):

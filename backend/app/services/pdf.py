@@ -138,10 +138,13 @@ def generate_pdf(project, estimate, load_calcs) -> str:
     summary = [
         ["Materials", f"${estimate.total_materials:,.2f}"],
         ["Labor", f"${labor_cost:,.2f} ({estimate.total_labor_hours:,.2f} hrs @ ${labor_rate:.2f}/hr)"],
-        [f"Markup ({estimate.markup_pct*100:.0f}%)", ""],
-        [f"Contingency ({estimate.contingency_pct*100:.0f}%)", ""],
-        [f"Tax ({estimate.tax_pct*100:.0f}%)", ""],
+        ["Direct Cost", f"${getattr(estimate, 'direct_cost', 0) or (estimate.total_materials + labor_cost):,.2f}"],
+        [f"Overhead ({(estimate.overhead_pct or 0.1)*100:.0f}%)", f"${getattr(estimate, 'overhead_cost', 0):,.2f}"],
+        [f"Contingency ({(estimate.contingency_pct or 0)*100:.0f}%)", f"${getattr(estimate, 'contingency_cost', 0):,.2f}"],
+        [f"Markup ({(estimate.markup_pct or 0)*100:.0f}%)", f"${getattr(estimate, 'markup_cost', 0):,.2f}"],
+        [f"Tax ({(estimate.tax_pct or 0)*100:.0f}%)", f"${getattr(estimate, 'tax_cost', 0):,.2f}"],
         ["Grand Total", f"${estimate.total_cost:,.2f}"],
+        ["Gross Margin", f"{(getattr(estimate, 'gross_margin', 0) or 0)*100:.1f}%  (profit ${getattr(estimate, 'profit', 0) or 0:,.2f})"],
     ]
     # labor summary
     if estimate.labor_summary:

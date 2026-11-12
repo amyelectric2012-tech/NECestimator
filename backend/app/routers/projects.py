@@ -1,10 +1,12 @@
+import dataclasses
+
 from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy.orm import Session
 
 from app.auth.deps import get_current_user
 from app.calculations.nec220 import HVAC, Appliance, ProjectInput, calculate_all
 from app.database import get_db
-from app.models import LoadCalculation, Project
+from app.models import CalculationRecord, LoadCalculation, Project
 from app.schemas.schemas import ProjectCreate, ProjectOut, ProjectUpdate
 
 router = APIRouter(prefix="/projects", tags=["projects"])
@@ -110,6 +112,15 @@ def calculate(project_id: str, db: Session = Depends(get_db), user=Depends(get_c
     for method, res in results.items():
         lc = LoadCalculation(project_id=proj.id, method=method, results=_result_to_dict(res))
         db.add(lc)
+        rec = CalculationRecord(
+            project_id=proj.id,
+            method=method,
+            code_edition=getattr(proj, "nec_edition", None) or "2017",
+            inputs=dataclasses.asdict(inp) if dataclasses.is_dataclass(inp) else (inp.__dict__ if hasattr(inp, "__dict__") else {}),
+            outputs=_result_to_dict(res),
+            warnings=[],
+        )
+        db.add(rec)
     db.commit()
     return {"project_id": proj.id, "results": {m: _result_to_dict(r) for m, r in results.items()}}
 

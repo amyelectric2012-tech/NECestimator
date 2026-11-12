@@ -44,6 +44,9 @@ class ProjectCreate(BaseModel):
     hvac: dict[str, Any] = {}
     largest_motor_va: float = 0.0
     existing_service_amps: float | None = None
+    jurisdiction: str | None = None
+    nec_edition: str = "2017"
+    labor_rate: float = 85.0
 
 
 class ProjectUpdate(BaseModel):
@@ -66,6 +69,9 @@ class ProjectUpdate(BaseModel):
     largest_motor_va: float | None = None
     existing_service_amps: float | None = None
     client_id: str | None = None
+    jurisdiction: str | None = None
+    nec_edition: str | None = None
+    labor_rate: float | None = None
 
 
 class ProjectOut(BaseModel):
@@ -89,6 +95,9 @@ class ProjectOut(BaseModel):
     largest_motor_va: float
     existing_service_amps: float | None = None
     client_id: str | None = None
+    jurisdiction: str | None = None
+    nec_edition: str = "2017"
+    labor_rate: float = 85.0
     owner_id: str
     created_at: datetime
     updated_at: datetime
@@ -140,6 +149,7 @@ class EstimateCreate(BaseModel):
     markup_pct: float = 0.10
     contingency_pct: float = 0.05
     tax_pct: float = 0.0
+    overhead_pct: float = 0.10
     scope_of_work: str | None = None
     assumptions: str | None = None
     line_items: list[dict[str, Any]] = []
@@ -156,6 +166,7 @@ class EstimateUpdate(BaseModel):
     markup_pct: float | None = None
     contingency_pct: float | None = None
     tax_pct: float | None = None
+    overhead_pct: float | None = None
     scope_of_work: str | None = None
     assumptions: str | None = None
     line_items: list[dict[str, Any]] | None = None
@@ -176,6 +187,7 @@ class EstimateOut(BaseModel):
     markup_pct: float
     contingency_pct: float
     tax_pct: float
+    overhead_pct: float = 0.10
     scope_of_work: str | None = None
     assumptions: str | None = None
     line_items: list[dict[str, Any]] = []
@@ -183,6 +195,13 @@ class EstimateOut(BaseModel):
     total_materials: float
     total_labor_hours: float
     total_cost: float
+    direct_cost: float = 0.0
+    overhead_cost: float = 0.0
+    contingency_cost: float = 0.0
+    markup_cost: float = 0.0
+    tax_cost: float = 0.0
+    profit: float = 0.0
+    gross_margin: float = 0.0
     pdf_path: str | None = None
     status: str = "draft"
     probability: float | None = None
