@@ -145,9 +145,10 @@ class LoadCalculation(Base):
 
 class Estimate(Base):
     __tablename__ = "estimates"
-    __table_args__ = (Index("ix_estimates_project_id", "project_id"),)
+    __table_args__ = (Index("ix_estimates_project_id", "project_id"), Index("ix_estimates_status", "status"), Index("ix_estimates_client_id", "client_id"),)
     id = Column(UUID(as_uuid=False), primary_key=True, default=gen_uuid)
     project_id = Column(UUID(as_uuid=False), ForeignKey("projects.id"), nullable=False)
+    client_id = Column(UUID(as_uuid=False), ForeignKey("clients.id"), nullable=True)
     name = Column(String(255), default="Bid")
     markup_pct = Column(Float, default=0.10)
     contingency_pct = Column(Float, default=0.05)
@@ -160,6 +161,27 @@ class Estimate(Base):
     total_labor_hours = Column(Float, default=0.0)
     total_cost = Column(Float, default=0.0)
     pdf_path = Column(String(500), nullable=True)
+    # CRM fields
+    status = Column(String(20), default="draft", server_default="draft", nullable=False)
+    probability = Column(Float, nullable=True)
+    follow_up_date = Column(DateTime, nullable=True)
+    next_action = Column(String(255), nullable=True)
+    crm_notes = Column(Text, nullable=True)
+    last_contacted_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     project = relationship("Project", back_populates="estimates")
+    client = relationship("Client")
+    activities = relationship("EstimateActivity", back_populates="estimate", cascade="all, delete-orphan", order_by="EstimateActivity.created_at.desc()")
+
+
+class EstimateActivity(Base):
+    __tablename__ = "estimate_activities"
+    __table_args__ = (Index("ix_estimate_activities_estimate_id", "estimate_id"),)
+    id = Column(UUID(as_uuid=False), primary_key=True, default=gen_uuid)
+    estimate_id = Column(UUID(as_uuid=False), ForeignKey("estimates.id"), nullable=False)
+    owner_id = Column(UUID(as_uuid=False), ForeignKey("users.id"), nullable=False)
+    activity_type = Column(String(30), default="note")
+    body = Column(Text, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    estimate = relationship("Estimate", back_populates="activities")

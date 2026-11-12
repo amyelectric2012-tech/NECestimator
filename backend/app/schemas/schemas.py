@@ -144,6 +144,11 @@ class EstimateCreate(BaseModel):
     assumptions: str | None = None
     line_items: list[dict[str, Any]] = []
     labor_summary: dict[str, Any] = {}
+    status: str | None = None
+    probability: float | None = None
+    follow_up_date: datetime | None = None
+    next_action: str | None = None
+    crm_notes: str | None = None
 
 
 class EstimateUpdate(BaseModel):
@@ -155,11 +160,18 @@ class EstimateUpdate(BaseModel):
     assumptions: str | None = None
     line_items: list[dict[str, Any]] | None = None
     labor_summary: dict[str, Any] | None = None
+    status: str | None = None
+    probability: float | None = None
+    follow_up_date: datetime | None = None
+    next_action: str | None = None
+    crm_notes: str | None = None
+    last_contacted_at: datetime | None = None
 
 
 class EstimateOut(BaseModel):
     id: str
     project_id: str
+    client_id: str | None = None
     name: str
     markup_pct: float
     contingency_pct: float
@@ -172,8 +184,30 @@ class EstimateOut(BaseModel):
     total_labor_hours: float
     total_cost: float
     pdf_path: str | None = None
+    status: str = "draft"
+    probability: float | None = None
+    follow_up_date: datetime | None = None
+    next_action: str | None = None
+    crm_notes: str | None = None
+    last_contacted_at: datetime | None = None
     created_at: datetime
     updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class EstimateActivityCreate(BaseModel):
+    activity_type: str = "note"
+    body: str
+
+
+class EstimateActivityOut(BaseModel):
+    id: str
+    estimate_id: str
+    activity_type: str
+    body: str
+    created_at: datetime
 
     class Config:
         from_attributes = True

@@ -14,6 +14,7 @@ from app.routers import (
     calculations,
     chat,
     clients,
+    crm,
     estimates,
     export,
     materials,
@@ -72,6 +73,7 @@ app.include_router(calculations.router)
 app.include_router(takeoff.router)
 app.include_router(chat.router)
 app.include_router(clients.router)
+app.include_router(crm.router)
 app.include_router(v1_calculations.router, prefix="/api/v1")
 
 

@@ -3,8 +3,8 @@ from sqlalchemy.orm import Session
 
 from app.auth.deps import get_current_user
 from app.database import get_db
-from app.models import Estimate, Material, Project
-from app.schemas.schemas import EstimateCreate, EstimateOut, EstimateUpdate
+from app.models import Estimate, EstimateActivity, Material, Project
+from app.schemas.schemas import EstimateActivityCreate, EstimateActivityOut, EstimateCreate, EstimateOut, EstimateUpdate
 
 router = APIRouter(prefix="/projects", tags=["estimates"])
 
@@ -31,7 +31,7 @@ def create_estimate(project_id: str, payload: EstimateCreate, db: Session = Depe
     proj = db.query(Project).filter(Project.id == project_id, Project.owner_id == user.id).first()
     if not proj:
         raise HTTPException(status_code=404, detail="Project not found")
-    est = Estimate(project_id=proj.id, **payload.model_dump())
+    est = Estimate(project_id=proj.id, client_id=proj.client_id, **payload.model_dump())
     _calc_totals(est, {})
     db.add(est)
     db.commit()
@@ -78,8 +78,30 @@ def update_estimate(project_id: str, estimate_id: str, payload: EstimateUpdate, 
     return est
 
 
-@router.delete("/{project_id}/estimates/{estimate_id}")
-def delete_estimate(project_id: str, estimate_id: str, db: Session = Depends(get_db), user=Depends(get_current_user)):
+@router.get("/{project_id}/estimates/{estimate_id}/activities", response_model=list[EstimateActivityOut])
+def list_activities(project_id: str, estimate_id: str, db: Session = Depends(get_db), user=Depends(get_current_user)):
+    proj = db.query(Project).filter(Project.id == project_id, Project.owner_id == user.id).first()
+    if not proj:
+        raise HTTPException(status_code=404, detail="Project not found")
+    est = db.query(Estimate).filter(Estimate.id == estimate_id, Estimate.project_id == proj.id).first()
+    if not est:
+        raise HTTPException(status_code=404, detail="Estimate not found")
+    return db.query(EstimateActivity).filter(EstimateActivity.estimate_id == est.id).order_by(EstimateActivity.created_at.desc()).all()
+
+
+@router.post("/{project_id}/estimates/{estimate_id}/activities", response_model=EstimateActivityOut)
+def add_activity(project_id: str, estimate_id: str, payload: EstimateActivityCreate, db: Session = Depends(get_db), user=Depends(get_current_user)):
+    proj = db.query(Project).filter(Project.id == project_id, Project.owner_id == user.id).first()
+    if not proj:
+        raise HTTPException(status_code=404, detail="Project not found")
+    est = db.query(Estimate).filter(Estimate.id == estimate_id, Estimate.project_id == proj.id).first()
+    if not est:
+        raise HTTPException(status_code=404, detail="Estimate not found")
+    act = EstimateActivity(estimate_id=est.id, owner_id=user.id, activity_type=payload.activity_type, body=payload.body)
+    db.add(act)
+    db.commit()
+    db.refresh(act)
+    return act
     proj = db.query(Project).filter(Project.id == project_id, Project.owner_id == user.id).first()
     if not proj:
         raise HTTPException(status_code=404, detail="Project not found")

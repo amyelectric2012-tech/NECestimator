@@ -49,6 +49,10 @@ export default function App() {
   const [chatHistory, setChatHistory] = useState<{ role: string; text: string }[]>([]);
   const [clients, setClients] = useState<any[]>([]);
   const [estimates, setEstimates] = useState<any[]>([]);
+  const [pipeline, setPipeline] = useState<any[]>([]);
+  const [crmEstimate, setCrmEstimate] = useState<any>(null);
+  const [crmActivities, setCrmActivities] = useState<any[]>([]);
+  const [crmActivityText, setCrmActivityText] = useState("");
   const [newClient, setNewClient] = useState({ name: "", email: "", phone: "", address: "" });
   const [workDesc, setWorkDesc] = useState("");
   const [workDescResult, setWorkDescResult] = useState<any>(null);
@@ -66,6 +70,8 @@ export default function App() {
   useEffect(() => { if (token && tab === "estimates") loadEstimates(); }, [tab, selected, token, projects]);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { if (token && tab === "nec" && !necStatus) loadNecMeta(); }, [tab, token]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { if (token && tab === "crm") loadPipeline(); }, [tab, token]);
 
   async function api(path: string, opts: any = {}) {
     const r = await fetch(`${API}${path}`, {
@@ -263,8 +269,32 @@ export default function App() {
       setNecOffset(off);
     } catch (e: any) { setError(e.message); }
   }
+  async function loadPipeline() {
+    try { setPipeline(await api("/crm/pipeline")); }
+    catch (e: any) { setError(e.message); }
+  }
+  async function openCrmEstimate(est: any) {
+    setCrmEstimate(est);
+    try { setCrmActivities(await api(`/crm/estimates/${est.id}/activities`)); }
+    catch (e: any) { setError(e.message); }
+  }
+  async function addCrmActivity() {
+    if (!crmEstimate || !crmActivityText.trim()) return;
+    try {
+      await api(`/crm/estimates/${crmEstimate.id}/activities`, { method: "POST", body: JSON.stringify({ activity_type: "note", body: crmActivityText }) });
+      setCrmActivityText("");
+      setCrmActivities(await api(`/crm/estimates/${crmEstimate.id}/activities`));
+      loadPipeline();
+    } catch (e: any) { setError(e.message); }
+  }
+  async function updateCrmStatus(est: any, status: string) {
+    try {
+      await api(`/crm/estimates/${est.id}`, { method: "PATCH", body: JSON.stringify({ status }) });
+      loadPipeline();
+      if (crmEstimate && crmEstimate.id === est.id) setCrmEstimate({ ...crmEstimate, status });
+    } catch (e: any) { setError(e.message); }
+  }
   async function sendChat() {
-    if (!selected || !chatInput.trim() || busy) return;
     const msg = chatInput.trim();
     setChatHistory(h => [...h, { role: "user", text: msg }]);
     setChatInput("");
@@ -308,7 +338,7 @@ export default function App() {
       )}
       {busy && <div style={{ position: "fixed", top: 12, left: 12, background: "#2563eb", color: "#fff", padding: "6px 12px", borderRadius: 6, zIndex: 1000, fontSize: 12 }}>Working…</div>}
       <div className="tabs">
-        {["projects", "estimates", "clients", "nec"].map(t => (
+        {["projects", "estimates", "clients", "crm", "nec"].map(t => (
           <div key={t} className={`tab ${tab === t ? "active" : ""}`} onClick={() => setTab(t)}>{t.toUpperCase()}</div>
         ))}
       </div>
@@ -618,6 +648,56 @@ export default function App() {
               {estimates.length === 0 && <tr><td colSpan={selected ? 6 : 7}>No estimates yet. Generate one from a project.</td></tr>}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {tab === "crm" && (
+        <div className="card">
+          <h3>Estimate CRM Pipeline</h3>
+          <div className="row" style={{ marginBottom: 8 }}>
+            <button className="btn" onClick={loadPipeline} disabled={busy}>Refresh</button>
+            <span style={{ fontSize: 12, color: "#6b7280" }}>{pipeline.length} estimates across all projects</span>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 8, alignItems: "start" }}>
+            {["draft","sent","viewed","accepted","rejected","lost"].map(status => (
+              <div key={status} style={{ background: "#f9fafb", borderRadius: 6, padding: 8, minHeight: 120 }}>
+                <h4 style={{ margin: "0 0 8px", textTransform: "capitalize", fontSize: 13 }}>{status}</h4>
+                {pipeline.filter(e => (e.status || "draft") === status).map(e => (
+                  <div key={e.id} style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 4, padding: 6, marginBottom: 6, fontSize: 12 }}>
+                    <div style={{ fontWeight: 600 }}>{e.name}</div>
+                    <div style={{ color: "#6b7280" }}>{e.client_name || "No client"} · {e.project_name}</div>
+                    <div>${Number(e.total_cost || 0).toFixed(2)} {e.probability != null && <span>({Math.round(e.probability*100)}%)</span>}</div>
+                    {e.next_action && <div style={{ color: "#2563eb" }}>→ {e.next_action}</div>}
+                    {e.follow_up_date && <div style={{ color: "#6b7280" }}>Follow up: {new Date(e.follow_up_date).toLocaleDateString()}</div>}
+                    <div className="row" style={{ marginTop: 4, gap: 4 }}>
+                      <select value={e.status || "draft"} onChange={ev => updateCrmStatus(e, ev.target.value)} style={{ fontSize: 11 }}>
+                        {["draft","sent","viewed","accepted","rejected","lost"].map(s => <option key={s} value={s}>{s}</option>)}
+                      </select>
+                      <button className="btn sm" onClick={() => openCrmEstimate(e)}>Notes</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ))}
+          </div>
+
+          {crmEstimate && (
+            <div style={{ marginTop: 16, borderTop: "1px solid #e5e7eb", paddingTop: 12 }}>
+              <h4>Activity Log — {crmEstimate.name}</h4>
+              <div className="row" style={{ marginBottom: 8 }}>
+                <input value={crmActivityText} onChange={e => setCrmActivityText(e.target.value)} placeholder="Add a note..." style={{ flex: 1 }} onKeyDown={e => e.key === "Enter" && addCrmActivity()} />
+                <button className="btn sm" onClick={addCrmActivity}>Add</button>
+                <button className="btn sm secondary" onClick={() => setCrmEstimate(null)}>Close</button>
+              </div>
+              {crmActivities.length === 0 && <p style={{ color: "#6b7280", fontSize: 12 }}>No activities yet.</p>}
+              {crmActivities.map(a => (
+                <div key={a.id} style={{ padding: 6, borderBottom: "1px solid #f3f4f6", fontSize: 12 }}>
+                  <div style={{ color: "#6b7280" }}>{new Date(a.created_at).toLocaleString()} · {a.activity_type}</div>
+                  <div>{a.body}</div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
